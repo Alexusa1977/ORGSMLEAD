@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { KeywordFile } from '../types';
 
 interface CreateFileDialogProps {
@@ -12,8 +12,10 @@ const CreateFileDialog: React.FC<CreateFileDialogProps> = ({ onClose, onSubmit, 
   const [name, setName] = useState(initialData?.name || '');
   const [niche, setNiche] = useState(initialData?.niche || '');
   const [location, setLocation] = useState(initialData?.location || '');
-  const [keywordsInput, setKeywordsInput] = useState(initialData?.keywords.join(', ') || '');
-  const [excludeKeywordsInput, setExcludeKeywordsInput] = useState(initialData?.excludeKeywords.join(', ') || '');
+  
+  // Defensive coding: use optional chaining and provide defaults to prevent crashes on old data
+  const [keywordsInput, setKeywordsInput] = useState(initialData?.keywords?.join(', ') || '');
+  const [excludeKeywordsInput, setExcludeKeywordsInput] = useState(initialData?.excludeKeywords?.join(', ') || '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

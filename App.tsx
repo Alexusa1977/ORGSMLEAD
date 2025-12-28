@@ -13,13 +13,23 @@ const App: React.FC = () => {
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Initialize with some dummy data if empty
+  // Initialize with migration for old data structures
   useEffect(() => {
     const savedFiles = localStorage.getItem('lead_sync_files');
     if (savedFiles) {
-      const parsed = JSON.parse(savedFiles);
-      setFiles(parsed);
-      if (parsed.length > 0) setActiveFileId(parsed[0].id);
+      try {
+        let parsed = JSON.parse(savedFiles);
+        // Data Migration: Ensure all files have required arrays even if created on older versions
+        const migrated = parsed.map((f: any) => ({
+          ...f,
+          keywords: f.keywords || [],
+          excludeKeywords: f.excludeKeywords || []
+        }));
+        setFiles(migrated);
+        if (migrated.length > 0) setActiveFileId(migrated[0].id);
+      } catch (e) {
+        console.error("Failed to parse saved files", e);
+      }
     } else {
       const defaultFile: KeywordFile = {
         id: 'default-1',
@@ -36,7 +46,9 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('lead_sync_files', JSON.stringify(files));
+    if (files.length > 0) {
+      localStorage.setItem('lead_sync_files', JSON.stringify(files));
+    }
   }, [files]);
 
   const activeFile = files.find(f => f.id === activeFileId);
