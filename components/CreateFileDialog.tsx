@@ -1,18 +1,19 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { KeywordFile } from '../types';
 
 interface CreateFileDialogProps {
   onClose: () => void;
   onSubmit: (file: Omit<KeywordFile, 'id' | 'createdAt'>) => void;
+  initialData?: KeywordFile;
 }
 
-const CreateFileDialog: React.FC<CreateFileDialogProps> = ({ onClose, onSubmit }) => {
-  const [name, setName] = useState('');
-  const [niche, setNiche] = useState('');
-  const [location, setLocation] = useState('');
-  const [keywordsInput, setKeywordsInput] = useState('');
-  const [excludeKeywordsInput, setExcludeKeywordsInput] = useState('');
+const CreateFileDialog: React.FC<CreateFileDialogProps> = ({ onClose, onSubmit, initialData }) => {
+  const [name, setName] = useState(initialData?.name || '');
+  const [niche, setNiche] = useState(initialData?.niche || '');
+  const [location, setLocation] = useState(initialData?.location || '');
+  const [keywordsInput, setKeywordsInput] = useState(initialData?.keywords.join(', ') || '');
+  const [excludeKeywordsInput, setExcludeKeywordsInput] = useState(initialData?.excludeKeywords.join(', ') || '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,9 +34,14 @@ const CreateFileDialog: React.FC<CreateFileDialogProps> = ({ onClose, onSubmit }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
       <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
-        <div className="p-8 border-b border-slate-100 bg-slate-50">
-          <h2 className="text-2xl font-bold text-slate-800">New Lead Collection</h2>
-          <p className="text-slate-500 text-sm mt-1">Configure your monitor to find specific organic leads.</p>
+        <div className="p-8 border-b border-slate-100 bg-slate-50 flex justify-between items-start">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">{initialData ? 'Update' : 'New'} Lead Collection</h2>
+            <p className="text-slate-500 text-sm mt-1">Configure your monitor to find specific organic leads.</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
         </div>
         
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
@@ -86,6 +92,7 @@ const CreateFileDialog: React.FC<CreateFileDialogProps> = ({ onClose, onSubmit }
                 value={keywordsInput}
                 onChange={(e) => setKeywordsInput(e.target.value)}
               ></textarea>
+              <p className="text-[10px] text-slate-400 mt-1">Separate keywords with commas.</p>
             </div>
 
             <div>
@@ -97,11 +104,11 @@ const CreateFileDialog: React.FC<CreateFileDialogProps> = ({ onClose, onSubmit }
                 value={excludeKeywordsInput}
                 onChange={(e) => setExcludeKeywordsInput(e.target.value)}
               ></textarea>
-              <p className="text-[10px] text-slate-400 mt-2 font-medium">Keywords to filter out results that aren't real customers.</p>
+              <p className="text-[10px] text-slate-400 mt-1 font-medium">Keywords to filter out results that aren't real customers.</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 pt-4">
+          <div className="flex items-center gap-3 pt-4 border-t border-slate-50 mt-2">
             <button 
               type="button" 
               onClick={onClose}
@@ -113,7 +120,7 @@ const CreateFileDialog: React.FC<CreateFileDialogProps> = ({ onClose, onSubmit }
               type="submit"
               className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
             >
-              Create Collection
+              {initialData ? 'Save Changes' : 'Create Collection'}
             </button>
           </div>
         </form>

@@ -10,7 +10,7 @@ const App: React.FC = () => {
   const [files, setFiles] = useState<KeywordFile[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [isCreatingFile, setIsCreatingFile] = useState(false);
+  const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Initialize with some dummy data if empty
@@ -41,15 +41,23 @@ const App: React.FC = () => {
 
   const activeFile = files.find(f => f.id === activeFileId);
 
-  const handleCreateFile = (newFile: Omit<KeywordFile, 'id' | 'createdAt'>) => {
+  const handleCreateFile = (newFileData: Omit<KeywordFile, 'id' | 'createdAt'>) => {
     const file: KeywordFile = {
-      ...newFile,
+      ...newFileData,
       id: `file-${Date.now()}`,
       createdAt: Date.now()
     };
     setFiles(prev => [...prev, file]);
     setActiveFileId(file.id);
-    setIsCreatingFile(false);
+    setDialogMode(null);
+  };
+
+  const handleUpdateFile = (updatedData: Omit<KeywordFile, 'id' | 'createdAt'>) => {
+    if (!activeFileId) return;
+    setFiles(prev => prev.map(f => 
+      f.id === activeFileId ? { ...f, ...updatedData } : f
+    ));
+    setDialogMode(null);
   };
 
   const handleRefreshLeads = useCallback(async () => {
@@ -85,8 +93,12 @@ const App: React.FC = () => {
         files={files} 
         activeFileId={activeFileId} 
         onSelectFile={setActiveFileId} 
-        onCreateClick={() => setIsCreatingFile(true)}
+        onCreateClick={() => setDialogMode('create')}
         onDeleteFile={handleDeleteFile}
+        onEditFile={(id) => {
+            setActiveFileId(id);
+            setDialogMode('edit');
+        }}
       />
       
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -100,6 +112,15 @@ const App: React.FC = () => {
             )}
           </div>
           <div className="flex items-center gap-4">
+            {activeFile && (
+                <button 
+                  onClick={() => setDialogMode('edit')}
+                  className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-colors"
+                  title="Edit Collection Settings"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </button>
+            )}
             <button 
               onClick={handleRefreshLeads}
               disabled={isRefreshing || !activeFile}
@@ -125,10 +146,11 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {isCreatingFile && (
+      {dialogMode && (
         <CreateFileDialog 
-          onClose={() => setIsCreatingFile(false)} 
-          onSubmit={handleCreateFile} 
+          onClose={() => setDialogMode(null)} 
+          onSubmit={dialogMode === 'create' ? handleCreateFile : handleUpdateFile} 
+          initialData={dialogMode === 'edit' ? activeFile : undefined}
         />
       )}
     </div>
