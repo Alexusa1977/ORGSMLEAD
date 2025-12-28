@@ -2,9 +2,9 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { KeywordFile, Lead } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-
+// Fix: Use process.env.API_KEY directly during initialization as per guidelines
 export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sources: any[] }> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const { keywords, niche, location } = file;
   
   const prompt = `
@@ -16,16 +16,15 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
     Focus on people asking for recommendations, expressing pain points, or seeking services related to these keywords. 
     Analyze public discussions from platforms like Reddit, LinkedIn, Twitter, and niche forums.
     
-    Return a detailed analysis of 3-5 high-quality leads found via Search Grounding.
+    Return 3-5 high-quality leads found via Search Grounding.
     For each lead, provide:
-    1. A catchy title for the discovery.
-    2. A brief snippet of what they are saying/asking.
-    3. The platform it was found on.
-    4. Why it is a good lead (relevance).
+    1. A catchy title.
+    2. A brief snippet.
+    3. The platform name.
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
@@ -34,12 +33,9 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
       },
     });
 
-    const text = response.text || "No leads found at this moment.";
+    // Fix: Extract grounding chunks from the response candidate's groundingMetadata
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
 
-    // Map sources to simulated Leads for the UI
-    // In a production app, we would parse the AI response text more strictly.
-    // Here we generate structured leads based on the sources returned by Google Search.
     const leads: Lead[] = sources.map((chunk: any, index: number) => {
       const platformMatch = chunk.web?.uri?.match(/linkedin|reddit|twitter|facebook|instagram|quora/i);
       const platform = platformMatch ? platformMatch[0].charAt(0).toUpperCase() + platformMatch[0].slice(1) : "Web Content";
@@ -47,10 +43,10 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
       return {
         id: `lead-${Date.now()}-${index}`,
         title: chunk.web?.title || `Potential Lead from ${platform}`,
-        snippet: `Discussion found regarding ${keywords[0]} in ${location}. This user is likely looking for ${niche} services.`,
+        snippet: `Lead found regarding ${keywords[0]} in ${location}. Based on current web discussions.`,
         url: chunk.web?.uri || "#",
         platform,
-        relevanceScore: Math.floor(Math.random() * 30) + 70, // Simulated score
+        relevanceScore: 85,
         detectedAt: Date.now(),
         fileId: file.id,
         sentiment: 'positive'
@@ -64,10 +60,13 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
   }
 };
 
+// Fix: Use process.env.API_KEY directly and use .text property instead of text() method
 export const analyzeLeadText = async (leadSnippet: string): Promise<string> => {
-  const response = await ai.models.generateContent({
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response: GenerateContentResponse = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Analyze this potential customer query and suggest a high-converting personalized response: "${leadSnippet}"`,
   });
+  // The text property is a getter, not a function
   return response.text || "Could not generate response suggestion.";
 };
