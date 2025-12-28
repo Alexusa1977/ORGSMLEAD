@@ -3,6 +3,7 @@ export interface KeywordFile {
   id: string;
   name: string;
   keywords: string[];
+  excludeKeywords: string[];
   niche: string;
   location: string;
   createdAt: number;

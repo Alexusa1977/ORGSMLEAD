@@ -25,6 +25,7 @@ const App: React.FC = () => {
         id: 'default-1',
         name: 'SaaS Leads',
         keywords: ['CRM for startups', 'marketing automation'],
+        excludeKeywords: ['jobs', 'internship'],
         niche: 'B2B Software',
         location: 'California, USA',
         createdAt: Date.now()
@@ -68,7 +69,7 @@ const App: React.FC = () => {
     if (activeFileId) {
       handleRefreshLeads();
     }
-  }, [activeFileId]); // Deliberately only when ID changes
+  }, [activeFileId]);
 
   const handleDeleteFile = (id: string) => {
     const newFiles = files.filter(f => f.id !== id);

@@ -24,10 +24,10 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, leads, isLoading }) =
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="mb-10 flex items-end justify-between">
+      <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">{activeFile.name}</h2>
-          <div className="flex items-center gap-6 mt-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Niche:</span>
               <span className="text-sm font-medium text-slate-600">{activeFile.niche}</span>
@@ -38,15 +38,29 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, leads, isLoading }) =
             </div>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm font-medium text-slate-500">Keywords being monitored</p>
-          <div className="flex flex-wrap gap-2 mt-2 justify-end">
-            {activeFile.keywords.map((kw, i) => (
-              <span key={i} className="bg-white border border-slate-200 px-3 py-1 rounded-full text-xs font-semibold text-slate-600 shadow-sm">
-                {kw}
-              </span>
-            ))}
+        <div className="text-left md:text-right space-y-3">
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Included Keywords</p>
+            <div className="flex flex-wrap gap-2 md:justify-end">
+              {activeFile.keywords.map((kw, i) => (
+                <span key={i} className="bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full text-[11px] font-bold text-indigo-600 shadow-sm">
+                  {kw}
+                </span>
+              ))}
+            </div>
           </div>
+          {activeFile.excludeKeywords?.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Excluded Keywords</p>
+              <div className="flex flex-wrap gap-2 md:justify-end">
+                {activeFile.excludeKeywords.map((kw, i) => (
+                  <span key={i} className="bg-rose-50 border border-rose-100 px-3 py-1 rounded-full text-[11px] font-bold text-rose-600 shadow-sm">
+                    {kw}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -54,14 +68,15 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, leads, isLoading }) =
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              Organic Opportunities
+              Recent Opportunities
               <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs">{leads.length}</span>
             </h3>
+            <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Last 3 Months</span>
           </div>
 
           {isLoading ? (
             <div className="space-y-4">
-              {[1, 2, 3].map(i => (
+              {[1, 2, 3, 4].map(i => (
                 <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 animate-pulse">
                   <div className="h-4 bg-slate-100 rounded w-1/3 mb-4"></div>
                   <div className="h-3 bg-slate-100 rounded w-full mb-2"></div>
@@ -87,38 +102,41 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, leads, isLoading }) =
         </div>
 
         <div className="space-y-6">
-          <div className="bg-indigo-900 rounded-2xl p-6 text-white shadow-xl shadow-indigo-100">
-            <h3 className="text-lg font-bold mb-4">AI Analysis Dashboard</h3>
+          <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-xl">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-indigo-400">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd"></path></svg>
+              Strategy Hub
+            </h3>
             <div className="space-y-4">
-              <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10">
-                <p className="text-indigo-200 text-xs font-bold uppercase tracking-wider mb-1">Market Sentiment</p>
+              <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Lead Health</p>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
-                    <div className="h-full bg-green-400" style={{ width: '75%' }}></div>
+                  <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500" style={{ width: `${Math.min(leads.length * 10, 100)}%` }}></div>
                   </div>
-                  <span className="text-sm font-bold">Positive</span>
+                  <span className="text-xs font-bold">{leads.length > 5 ? 'High' : 'Moderate'}</span>
                 </div>
               </div>
-              <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/10">
-                <p className="text-indigo-200 text-xs font-bold uppercase tracking-wider mb-1">Suggested Niche Focus</p>
-                <p className="text-sm font-semibold">"Focus on high-growth startups in {activeFile.location} for maximum conversion."</p>
+              <div className="bg-white/5 p-4 rounded-xl border border-white/10">
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">AI Recommendation</p>
+                <p className="text-xs text-slate-300 italic">"Detected strong search intent in ${activeFile.location}. Increase outreach velocity for ${activeFile.keywords[0]}."</p>
               </div>
             </div>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl p-6">
             <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
-              Quick Tips
+              <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+              Filter Optimization
             </h3>
             <ul className="space-y-3">
-              <li className="text-xs text-slate-600 flex gap-2">
+              <li className="text-[11px] text-slate-600 flex gap-2">
                 <span className="text-indigo-600 font-bold">•</span>
-                Use specific phrases like "looking for recommendations" as keywords for higher quality.
+                Excluded keywords stop the AI from showing irrelevant job posts or spam.
               </li>
-              <li className="text-xs text-slate-600 flex gap-2">
+              <li className="text-[11px] text-slate-600 flex gap-2">
                 <span className="text-indigo-600 font-bold">•</span>
-                Targeting a specific city often yields more actionable organic leads.
+                Recency is locked to 3 months to ensure you don't chase dead leads.
               </li>
             </ul>
           </div>
