@@ -1,0 +1,7 @@
+{
+  "name": "ORGSMLEAD",
+  "description": "A powerful dashboard to monitor keywords across social platforms and the web to find organic leads, filter by niche, and target specific locations.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
