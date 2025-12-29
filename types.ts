@@ -17,6 +17,14 @@ export interface FacebookGroup {
   niche: string;
 }
 
+export interface PlatformConnection {
+  platform: string;
+  isConnected: boolean;
+  accountName?: string;
+  neighborhoodUrl?: string; // Specific for Nextdoor
+  lastSyncedAt?: number;
+}
+
 export type LeadStatus = 'to_be_outreached' | 'outreached' | 'followed_up' | 'replied';
 
 export interface Lead {

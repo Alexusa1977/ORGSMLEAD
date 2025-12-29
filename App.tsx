@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { KeywordFile, Lead, LeadStatus, FacebookGroup } from './types';
+import { KeywordFile, Lead, LeadStatus, FacebookGroup, PlatformConnection } from './types';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import OverviewDashboard from './components/OverviewDashboard';
 import CreateFileDialog from './components/CreateFileDialog';
+import NextdoorConnector from './components/NextdoorConnector';
 import { findLeads } from './services/geminiService';
 
 const App: React.FC = () => {
@@ -12,6 +13,12 @@ const App: React.FC = () => {
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [activePlatform, setActivePlatform] = useState<string | null>(null);
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
+  const [connections, setConnections] = useState<PlatformConnection[]>([
+    { platform: 'facebook', isConnected: false },
+    { platform: 'nextdoor', isConnected: false },
+    { platform: 'quora', isConnected: false },
+    { platform: 'instagram', isConnected: false },
+  ]);
   const [activeView, setActiveView] = useState<'dashboard' | 'outreach' | 'settings' | 'collection' | 'platform'>('dashboard');
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -21,16 +28,12 @@ const App: React.FC = () => {
   useEffect(() => {
     const savedFiles = localStorage.getItem('lead_sync_files');
     const savedLeads = localStorage.getItem('lead_sync_leads');
+    const savedConnections = localStorage.getItem('lead_sync_connections');
     
     if (savedFiles) {
       try {
         let parsed = JSON.parse(savedFiles);
-        const migrated = parsed.map((f: any) => ({
-          ...f,
-          keywords: f.keywords || [],
-          excludeKeywords: f.excludeKeywords || []
-        }));
-        setFiles(migrated);
+        setFiles(parsed);
       } catch (e) { console.error(e); }
     } else {
       const defaultFile: KeywordFile = {
@@ -47,12 +50,13 @@ const App: React.FC = () => {
 
     if (savedLeads) {
       try {
-        const parsedLeads = JSON.parse(savedLeads);
-        setAllLeads(parsedLeads.map((l: any) => ({ 
-          ...l, 
-          status: l.status || 'to_be_outreached',
-          detectedAt: l.detectedAt || Date.now()
-        })));
+        setAllLeads(JSON.parse(savedLeads));
+      } catch (e) { console.error(e); }
+    }
+
+    if (savedConnections) {
+      try {
+        setConnections(JSON.parse(savedConnections));
       } catch (e) { console.error(e); }
     }
     
@@ -62,28 +66,20 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (isInitialized.current && files.length > 0) {
-      localStorage.setItem('lead_sync_files', JSON.stringify(files));
-    }
-  }, [files]);
-
-  useEffect(() => {
     if (isInitialized.current) {
+      localStorage.setItem('lead_sync_files', JSON.stringify(files));
       localStorage.setItem('lead_sync_leads', JSON.stringify(allLeads));
+      localStorage.setItem('lead_sync_connections', JSON.stringify(connections));
     }
-  }, [allLeads]);
+  }, [files, allLeads, connections]);
 
   const activeFile = files.find(f => f.id === activeFileId) || files[0];
+  const nextdoorConnection = connections.find(c => c.platform === 'nextdoor');
   
   const getFilteredLeads = () => {
     if (activeView === 'dashboard') return allLeads;
     if (activeView === 'platform' && activePlatform) {
-      return allLeads.filter(l => {
-        const plat = l.platform.toLowerCase();
-        const target = activePlatform.toLowerCase();
-        if (target === 'web') return plat === 'web';
-        return plat.includes(target);
-      });
+      return allLeads.filter(l => l.platform.toLowerCase().includes(activePlatform.toLowerCase()));
     }
     if (activeView === 'collection' && activeFileId) {
       return allLeads.filter(l => l.fileId === activeFileId);
@@ -94,11 +90,7 @@ const App: React.FC = () => {
   const currentLeads = getFilteredLeads().sort((a, b) => b.detectedAt - a.detectedAt);
 
   const handleCreateFile = (newFileData: Omit<KeywordFile, 'id' | 'createdAt'>) => {
-    const file: KeywordFile = {
-      ...newFileData,
-      id: `file-${Date.now()}`,
-      createdAt: Date.now()
-    };
+    const file: KeywordFile = { ...newFileData, id: `file-${Date.now()}`, createdAt: Date.now() };
     setFiles(prev => [...prev, file]);
     setActiveFileId(file.id);
     setActiveView('collection');
@@ -107,9 +99,7 @@ const App: React.FC = () => {
 
   const handleUpdateFile = (updatedData: Omit<KeywordFile, 'id' | 'createdAt'>) => {
     if (!activeFileId) return;
-    setFiles(prev => prev.map(f => 
-      f.id === activeFileId ? { ...f, ...updatedData } : f
-    ));
+    setFiles(prev => prev.map(f => f.id === activeFileId ? { ...f, ...updatedData } : f));
     setDialogMode(null);
   };
 
@@ -119,10 +109,13 @@ const App: React.FC = () => {
     try {
       const scanFile = { ...activeFile, ...overrides };
       const platformToScan = activeView === 'platform' ? activePlatform : undefined;
-      const searchGroups = overrides?.searchGroups || false;
-      const targetGroups = overrides?.targetGroups || [];
       
-      const { leads: foundLeads } = await findLeads(scanFile, platformToScan, searchGroups, targetGroups);
+      // Inject nextdoor context if connected
+      if (platformToScan === 'nextdoor' && nextdoorConnection?.isConnected) {
+        scanFile.location = `${scanFile.location} (Specifically scanning neighborhood: ${nextdoorConnection.accountName})`;
+      }
+
+      const { leads: foundLeads } = await findLeads(scanFile, platformToScan, overrides?.searchGroups, overrides?.targetGroups);
       
       setAllLeads(prev => {
         const existingUrls = new Set(prev.map(l => l.url));
@@ -138,22 +131,14 @@ const App: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [activeFile, activeView, activePlatform, activeFileId]);
+  }, [activeFile, activeView, activePlatform, activeFileId, nextdoorConnection]);
 
-  const handleDeleteFile = (id: string) => {
-    const newFiles = files.filter(f => f.id !== id);
-    setFiles(newFiles);
-    setAllLeads(prev => prev.filter(l => l.fileId !== id));
-    if (activeFileId === id) {
-      setActiveFileId(null);
-      setActiveView('dashboard');
-    }
-  };
-
-  const handleNavigateToPlatform = (platform: string) => {
-    setActivePlatform(platform);
-    setActiveFileId(null);
-    setActiveView('platform');
+  const handleNextdoorConnect = (data: { name: string, url: string }) => {
+    setConnections(prev => prev.map(c => 
+      c.platform === 'nextdoor' 
+        ? { ...c, isConnected: true, accountName: data.name, neighborhoodUrl: data.url, lastSyncedAt: Date.now() } 
+        : c
+    ));
   };
 
   return (
@@ -161,12 +146,13 @@ const App: React.FC = () => {
       <Sidebar 
         files={files} 
         leads={allLeads}
+        connections={connections}
         activeFileId={activeFileId} 
         activePlatform={activePlatform}
         onSelectFile={(id) => { setActiveFileId(id); setActivePlatform(null); setActiveView('collection'); }}
-        onSelectPlatform={handleNavigateToPlatform}
+        onSelectPlatform={(p) => { setActivePlatform(p); setActiveFileId(null); setActiveView('platform'); }}
         onCreateClick={() => setDialogMode('create')}
-        onDeleteFile={handleDeleteFile}
+        onDeleteFile={(id) => setFiles(prev => prev.filter(f => f.id !== id))}
         onEditFile={(id) => { setActiveFileId(id); setDialogMode('edit'); }}
         activeView={activeView}
         onNavigate={setActiveView}
@@ -174,29 +160,22 @@ const App: React.FC = () => {
       
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
-          <div className="flex items-center gap-4 text-slate-400">
-            <h1 className="text-xl font-bold text-slate-800">
-              {activeView === 'dashboard' ? 'Overview' : 
-               activeView === 'platform' && activePlatform ? `${activePlatform === 'web' ? 'General Web' : activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)} Leads` :
-               activeView === 'outreach' ? 'All Leads' :
-               files.find(f => f.id === activeFileId)?.name || 'Lead Vault'}
-            </h1>
-            {activeView === 'platform' && activePlatform && (
-              <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                Platform Scan
-              </span>
-            )}
-            {activeView === 'collection' && activeFileId && (
-              <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                Collection Scan
-              </span>
-            )}
-          </div>
+          <h1 className="text-xl font-bold text-slate-800 capitalize">
+            {activeView === 'dashboard' ? 'Overview' : activePlatform || activeFile?.name || 'Leads'}
+          </h1>
+          {activePlatform === 'nextdoor' && nextdoorConnection?.isConnected && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-100">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Linked to {nextdoorConnection.accountName}
+            </div>
+          )}
         </header>
 
         <div className="flex-1 overflow-y-auto p-8">
           {activeView === 'dashboard' ? (
-            <OverviewDashboard leads={allLeads} onPlatformClick={handleNavigateToPlatform} />
+            <OverviewDashboard leads={allLeads} onPlatformClick={(p) => { setActivePlatform(p); setActiveView('platform'); }} />
+          ) : activePlatform === 'nextdoor' && !nextdoorConnection?.isConnected ? (
+            <NextdoorConnector onConnect={handleNextdoorConnect} />
           ) : (
             <Dashboard 
               activeFile={files.find(f => f.id === activeFileId) || null} 
