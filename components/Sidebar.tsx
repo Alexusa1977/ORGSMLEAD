@@ -33,6 +33,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { name: 'Facebook', id: 'facebook', icon: 'f' },
     { name: 'Instagram', id: 'instagram', icon: 'ig' },
     { name: 'Quora', id: 'quora', icon: 'q' },
+    { name: 'Nextdoor', id: 'nextdoor', icon: 'n' },
     { name: 'General Web', id: 'web', icon: 'w' },
   ];
 

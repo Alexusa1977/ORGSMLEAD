@@ -56,13 +56,11 @@ const App: React.FC = () => {
       } catch (e) { console.error(e); }
     }
     
-    // Use a small delay or requestAnimationFrame to ensure states are updated before marking as initialized
     setTimeout(() => {
       isInitialized.current = true;
     }, 100);
   }, []);
 
-  // Save data - only after initial load to prevent overwriting
   useEffect(() => {
     if (isInitialized.current && files.length > 0) {
       localStorage.setItem('lead_sync_files', JSON.stringify(files));
@@ -75,16 +73,14 @@ const App: React.FC = () => {
     }
   }, [allLeads]);
 
-  const activeFile = files.find(f => f.id === activeFileId);
+  const activeFile = files.find(f => f.id === activeFileId) || files[0];
   
-  // Filtering logic
   const getFilteredLeads = () => {
     if (activeView === 'dashboard') return allLeads;
     if (activeView === 'platform' && activePlatform) {
       return allLeads.filter(l => {
         const plat = l.platform.toLowerCase();
         const target = activePlatform.toLowerCase();
-        // Handle special cases or exact matches
         if (target === 'web') return plat === 'web';
         return plat.includes(target);
       });
@@ -121,7 +117,8 @@ const App: React.FC = () => {
     if (!activeFile) return;
     setIsRefreshing(true);
     try {
-      const { leads: foundLeads } = await findLeads(activeFile);
+      const platformToScan = activeView === 'platform' ? activePlatform : undefined;
+      const { leads: foundLeads } = await findLeads(activeFile, platformToScan);
       
       setAllLeads(prev => {
         const existingUrls = new Set(prev.map(l => l.url));
@@ -136,7 +133,7 @@ const App: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [activeFile]);
+  }, [activeFile, activeView, activePlatform]);
 
   const handleDeleteFile = (id: string) => {
     const newFiles = files.filter(f => f.id !== id);
@@ -172,21 +169,26 @@ const App: React.FC = () => {
       
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 text-slate-400">
             <h1 className="text-xl font-bold text-slate-800">
               {activeView === 'dashboard' ? 'Overview' : 
                activeView === 'platform' && activePlatform ? `${activePlatform === 'web' ? 'General Web' : activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)} Leads` :
                activeView === 'outreach' ? 'All Leads' :
-               activeFile?.name || 'Lead Vault'}
+               files.find(f => f.id === activeFileId)?.name || 'Lead Vault'}
             </h1>
-            {activeView === 'collection' && activeFile && (
-              <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-xs font-bold">
-                Scanning Keywords
+            {activeView === 'platform' && activePlatform && (
+              <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                Platform Scan
+              </span>
+            )}
+            {activeView === 'collection' && activeFileId && (
+              <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                Collection Scan
               </span>
             )}
           </div>
           <div className="flex items-center gap-4">
-            {activeView === 'collection' && activeFile && (
+            {(activeView === 'collection' || activeView === 'platform') && (
               <button 
                 onClick={handleRefreshLeads}
                 disabled={isRefreshing}
@@ -198,7 +200,7 @@ const App: React.FC = () => {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 )}
-                {isRefreshing ? 'Scanning...' : 'Scan New Leads'}
+                {isRefreshing ? 'Scanning...' : `Scan ${activeView === 'platform' ? activePlatform : 'Leads'}`}
               </button>
             )}
           </div>
@@ -209,7 +211,7 @@ const App: React.FC = () => {
             <OverviewDashboard leads={allLeads} onPlatformClick={handleNavigateToPlatform} />
           ) : (
             <Dashboard 
-              activeFile={activeFile || null} 
+              activeFile={files.find(f => f.id === activeFileId) || null} 
               activePlatform={activePlatform}
               leads={currentLeads} 
               isLoading={isRefreshing}
@@ -223,7 +225,7 @@ const App: React.FC = () => {
         <CreateFileDialog 
           onClose={() => setDialogMode(null)} 
           onSubmit={dialogMode === 'create' ? handleCreateFile : handleUpdateFile} 
-          initialData={dialogMode === 'edit' ? activeFile : undefined}
+          initialData={dialogMode === 'edit' ? files.find(f => f.id === activeFileId) : undefined}
         />
       )}
     </div>

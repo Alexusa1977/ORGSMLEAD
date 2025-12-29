@@ -19,6 +19,7 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads, onPlatform
     { name: 'Facebook', id: 'facebook', count: getCountByPlatform('facebook'), icon: 'F', color: 'bg-blue-600' },
     { name: 'Quora', id: 'quora', count: getCountByPlatform('quora'), icon: 'Q', color: 'bg-red-700' },
     { name: 'Instagram', id: 'instagram', count: getCountByPlatform('instagram'), icon: 'Ig', color: 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600' },
+    { name: 'Nextdoor', id: 'nextdoor', count: getCountByPlatform('nextdoor'), icon: 'N', color: 'bg-emerald-600' },
     { name: 'General Web', id: 'web', count: getCountByPlatform('web'), icon: 'W', color: 'bg-slate-700' },
   ];
 
@@ -66,8 +67,8 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads, onPlatform
             <div className="bg-white/50 p-5 rounded-2xl border border-dashed border-slate-200 flex flex-col justify-center items-start group hover:bg-white transition-all cursor-not-allowed opacity-60">
               <span className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">Connect</span>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-[10px] font-bold uppercase shadow-sm">n</div>
-                <span className="text-xs font-medium text-slate-400">Nextdoor</span>
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-[10px] font-bold uppercase shadow-sm">w</div>
+                <span className="text-xs font-medium text-slate-400">Whatsapp</span>
               </div>
             </div>
           </div>
