@@ -69,9 +69,14 @@ const App: React.FC = () => {
   
   // Filtering logic
   const getFilteredLeads = () => {
-    if (activeView === 'dashboard') return allLeads.sort((a, b) => b.detectedAt - a.detectedAt).slice(0, 10);
+    if (activeView === 'dashboard') return allLeads;
     if (activeView === 'platform' && activePlatform) {
-      return allLeads.filter(l => l.platform.toLowerCase().includes(activePlatform.toLowerCase()));
+      return allLeads.filter(l => {
+        const plat = l.platform.toLowerCase();
+        const target = activePlatform.toLowerCase();
+        if (target === 'x') return plat === 'x' || plat === 'twitter';
+        return plat.includes(target);
+      });
     }
     if (activeView === 'collection' && activeFileId) {
       return allLeads.filter(l => l.fileId === activeFileId);
@@ -159,7 +164,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold text-slate-800">
               {activeView === 'dashboard' ? 'Overview' : 
-               activeView === 'platform' ? `${activePlatform} Leads` :
+               activeView === 'platform' ? `${activePlatform === 'x' ? 'Twitter/X' : activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)} Leads` :
                activeView === 'outreach' ? 'All Leads' :
                activeFile?.name}
             </h1>
@@ -190,7 +195,7 @@ const App: React.FC = () => {
 
         <div className="flex-1 overflow-y-auto p-8">
           {activeView === 'dashboard' ? (
-            <OverviewDashboard leads={allLeads} />
+            <OverviewDashboard leads={allLeads} onPlatformClick={handleNavigateToPlatform} />
           ) : (
             <Dashboard 
               activeFile={activeFile || null} 

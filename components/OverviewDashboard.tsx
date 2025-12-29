@@ -5,18 +5,29 @@ import LeadCard from './LeadCard';
 
 interface OverviewDashboardProps {
   leads: Lead[];
+  onPlatformClick: (platform: string) => void;
 }
 
-const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
-  const getCountByPlatform = (platform: string) => leads.filter(l => l.platform.toLowerCase().includes(platform.toLowerCase())).length;
+const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads, onPlatformClick }) => {
+  const getCountByPlatform = (platform: string) => {
+    // Be inclusive with platform naming (e.g., 'X' or 'Twitter')
+    if (platform.toLowerCase() === 'x') {
+      return leads.filter(l => 
+        l.platform.toLowerCase() === 'x' || 
+        l.platform.toLowerCase() === 'twitter'
+      ).length;
+    }
+    return leads.filter(l => l.platform.toLowerCase().includes(platform.toLowerCase())).length;
+  };
+
   const getCountByStatus = (status: string) => leads.filter(l => l.status === status).length;
 
   const platforms = [
-    { name: 'Facebook', count: getCountByPlatform('facebook'), icon: 'F', color: 'bg-blue-600' },
-    { name: 'LinkedIn', count: getCountByPlatform('linkedin'), icon: 'In', color: 'bg-blue-700' },
-    { name: 'Instagram', count: getCountByPlatform('instagram'), icon: 'Ig', color: 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600' },
-    { name: 'Twitter/X', count: getCountByPlatform('x') || getCountByPlatform('twitter'), icon: 'X', color: 'bg-slate-900' },
-    { name: 'Reddit', count: getCountByPlatform('reddit'), icon: 'R', color: 'bg-orange-600' },
+    { name: 'Facebook', id: 'facebook', count: getCountByPlatform('facebook'), icon: 'F', color: 'bg-blue-600' },
+    { name: 'LinkedIn', id: 'linkedin', count: getCountByPlatform('linkedin'), icon: 'In', color: 'bg-blue-700' },
+    { name: 'Instagram', id: 'instagram', count: getCountByPlatform('instagram'), icon: 'Ig', color: 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600' },
+    { name: 'Twitter/X', id: 'x', count: getCountByPlatform('x'), icon: 'X', color: 'bg-slate-900' },
+    { name: 'Reddit', id: 'reddit', count: getCountByPlatform('reddit'), icon: 'R', color: 'bg-orange-600' },
   ];
 
   const stats = [
@@ -26,7 +37,7 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
     { label: 'Replied', value: getCountByStatus('replied'), sub: 'Hot leads' },
   ];
 
-  const recentLeads = leads.sort((a, b) => b.detectedAt - a.detectedAt).slice(0, 6);
+  const recentLeads = [...leads].sort((a, b) => b.detectedAt - a.detectedAt).slice(0, 6);
 
   return (
     <div className="max-w-6xl mx-auto space-y-12 py-4">
@@ -39,33 +50,39 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {platforms.map((p) => (
-              <div key={p.name} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+              <button 
+                key={p.id} 
+                onClick={() => onPlatformClick(p.id)}
+                className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all text-left group"
+              >
                 <div className="flex items-baseline gap-2 mb-4">
-                   <span className="text-2xl font-bold text-indigo-900">{p.count > 1000 ? (p.count / 1000).toFixed(1) + 'K' : p.count}</span>
-                   <span className="text-sm font-semibold text-indigo-800">leads</span>
+                   <span className="text-2xl font-bold text-indigo-900 group-hover:text-indigo-600 transition-colors">
+                     {p.count > 1000 ? (p.count / 1000).toFixed(1) + 'K' : p.count}
+                   </span>
+                   <span className="text-sm font-semibold text-indigo-800 opacity-60">leads</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-full ${p.color} flex items-center justify-center text-white text-[10px] font-bold shadow-sm`}>
                     {p.icon}
                   </div>
-                  <span className="text-xs font-medium text-slate-600 truncate">{p.name}</span>
+                  <span className="text-xs font-bold text-slate-600 truncate">{p.name}</span>
                 </div>
-              </div>
+              </button>
             ))}
             
             {/* Connect placeholders */}
-            <div className="bg-white/50 p-5 rounded-2xl border border-dashed border-slate-200 flex flex-col justify-center items-start group hover:bg-white transition-all cursor-pointer">
+            <div className="bg-white/50 p-5 rounded-2xl border border-dashed border-slate-200 flex flex-col justify-center items-start group hover:bg-white transition-all cursor-not-allowed opacity-60">
               <span className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">Connect</span>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-[10px] font-bold uppercase shadow-sm">n</div>
-                <span className="text-xs font-medium text-slate-400 group-hover:text-slate-600">Nextdoor</span>
+                <span className="text-xs font-medium text-slate-400">Nextdoor</span>
               </div>
             </div>
-            <div className="bg-white/50 p-5 rounded-2xl border border-dashed border-slate-200 flex flex-col justify-center items-start group hover:bg-white transition-all cursor-pointer">
+            <div className="bg-white/50 p-5 rounded-2xl border border-dashed border-slate-200 flex flex-col justify-center items-start group hover:bg-white transition-all cursor-not-allowed opacity-60">
               <span className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">Connect</span>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-[10px] font-bold uppercase shadow-sm">w</div>
-                <span className="text-xs font-medium text-slate-400 group-hover:text-slate-600">Whatsapp</span>
+                <span className="text-xs font-medium text-slate-400">Whatsapp</span>
               </div>
             </div>
           </div>
@@ -78,7 +95,7 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
           </h3>
           <div className="grid grid-cols-2 gap-4">
             {stats.map((s) => (
-              <div key={s.label} className="bg-white/40 p-6 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center backdrop-blur-sm">
+              <div key={s.label} className="bg-white p-6 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center shadow-sm">
                 <span className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-wider">{s.label}</span>
                 <span className="text-3xl font-bold text-indigo-900 mb-1">{s.value > 1000 ? (s.value / 1000).toFixed(1) + 'K' : s.value}</span>
                 <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">{s.sub}</span>
