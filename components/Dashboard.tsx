@@ -119,26 +119,41 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, leads, isLoading }) =
               </div>
               <div className="bg-white/5 p-4 rounded-xl border border-white/10">
                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">AI Recommendation</p>
-                <p className="text-xs text-slate-300 italic">"Detected strong search intent in ${activeFile.location}. Increase outreach velocity for ${activeFile.keywords[0]}."</p>
+                <p className="text-xs text-slate-300 italic">"Scanning public discussions across X, Reddit, and LinkedIn for ${activeFile.niche} opportunities."</p>
               </div>
             </div>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl p-6">
             <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
-              Filter Optimization
+              <svg className="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path><path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"></path></svg>
+              Coverage Matrix
             </h3>
-            <ul className="space-y-3">
-              <li className="text-[11px] text-slate-600 flex gap-2">
-                <span className="text-indigo-600 font-bold">•</span>
-                Excluded keywords stop the AI from showing irrelevant job posts or spam.
-              </li>
-              <li className="text-[11px] text-slate-600 flex gap-2">
-                <span className="text-indigo-600 font-bold">•</span>
-                Recency is locked to 3 months to ensure you don't chase dead leads.
-              </li>
-            </ul>
+            <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Public X/Twitter</span>
+                    <span className="text-green-600 font-bold uppercase">Active</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Reddit Communities</span>
+                    <span className="text-green-600 font-bold uppercase">Active</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Public LinkedIn</span>
+                    <span className="text-green-600 font-bold uppercase">Active</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Threads & Bluesky</span>
+                    <span className="text-green-600 font-bold uppercase">Active</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Public Telegram</span>
+                    <span className="text-green-600 font-bold uppercase">Active</span>
+                </div>
+                <div className="mt-3 pt-3 border-t border-slate-100">
+                    <p className="text-[10px] text-slate-400 italic">Note: Private Facebook groups and encrypted chats (WhatsApp) are not searchable for privacy compliance.</p>
+                </div>
+            </div>
           </div>
         </div>
       </div>
