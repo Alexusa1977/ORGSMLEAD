@@ -49,7 +49,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
     onScanClick({
       keywords,
       location: localLocation,
-      niche: localNiche,
+      niche: activePlatform === 'facebook' ? (keywords[0] || 'General') : localNiche,
       searchGroups: activePlatform === 'facebook' ? (searchGroupsToggle || targetGroups.length > 0) : false,
       targetGroups: targetGroups.length > 0 ? targetGroups : undefined
     });
@@ -57,16 +57,21 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
   };
 
   const handleFindGroups = async () => {
-    if (!localNiche) {
-      setSearchError("Please enter a niche first.");
+    const keywords = localKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    // Use niche if available, otherwise use the first keyword as the niche for group discovery
+    const effectiveNiche = activePlatform === 'facebook' ? (keywords[0] || '') : localNiche;
+
+    if (!effectiveNiche) {
+      setSearchError(activePlatform === 'facebook' ? "Please enter at least one keyword first." : "Please enter a niche first.");
       return;
     }
+
     setSearchError(null);
     setIsFindingGroups(true);
     try {
-      const groups = await findFacebookGroups(localNiche, localLocation);
+      const groups = await findFacebookGroups(effectiveNiche, localLocation);
       if (groups.length === 0) {
-        setSearchError(`No public groups found for "${localNiche}" in "${localLocation}". Try a broader niche.`);
+        setSearchError(`No public groups found for "${effectiveNiche}" in "${localLocation}". Try different keywords.`);
       } else {
         setDiscoveredGroups(groups);
         // Auto-select all by default
@@ -118,6 +123,8 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
     document.body.removeChild(link);
   };
 
+  const isFacebook = activePlatform === 'facebook';
+
   return (
     <div className="max-w-6xl mx-auto pb-20">
       {/* Search Configuration Panel */}
@@ -132,7 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
             </div>
             <div className="text-left">
               <h3 className="font-bold text-slate-800">Search Parameters</h3>
-              <p className="text-xs text-slate-500">Target specific keywords, cities, and niche communities</p>
+              <p className="text-xs text-slate-500">Target specific keywords and cities{!isFacebook ? ', and niche communities' : ''}</p>
             </div>
           </div>
           <svg className={`w-5 h-5 text-slate-400 transition-transform ${isConfigOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -151,26 +158,28 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                 />
               </div>
-              <div>
+              <div className={isFacebook ? 'md:col-span-2' : ''}>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">City / State</label>
                 <input 
-                  type="text"
+                  type="text" 
                   value={localLocation}
                   onChange={(e) => setLocalLocation(e.target.value)}
                   placeholder="e.g. Austin, TX"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                 />
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Niche / Industry</label>
-                <input 
-                  type="text"
-                  value={localNiche}
-                  onChange={(e) => setLocalNiche(e.target.value)}
-                  placeholder="e.g. Home Services"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                />
-              </div>
+              {!isFacebook && (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Niche / Industry</label>
+                  <input 
+                    type="text"
+                    value={localNiche}
+                    onChange={(e) => setLocalNiche(e.target.value)}
+                    placeholder="e.g. Home Services"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                  />
+                </div>
+              )}
               <div className="flex items-end">
                 <button 
                   onClick={handleRunScan}
@@ -184,7 +193,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
               </div>
             </div>
 
-            {activePlatform === 'facebook' && (
+            {isFacebook && (
               <div className="mt-6 p-5 bg-slate-50 rounded-2xl border border-slate-200">
                 <div className="flex items-center justify-between mb-4">
                    <div>
@@ -193,7 +202,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
                    </div>
                    <button 
                      onClick={handleFindGroups}
-                     disabled={isFindingGroups || !localNiche}
+                     disabled={isFindingGroups || (!localKeywords && !localNiche)}
                      className="px-4 py-2 bg-white border border-slate-300 text-indigo-600 rounded-lg text-[10px] font-bold hover:bg-indigo-50 transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
                    >
                      {isFindingGroups ? (
@@ -262,7 +271,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
                 {leads.length} Active Leads
              </div>
-             {selectedGroupIds.size > 0 && activePlatform === 'facebook' && (
+             {selectedGroupIds.size > 0 && isFacebook && (
                 <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Targeting {selectedGroupIds.size} Communities</span>
              )}
           </div>
