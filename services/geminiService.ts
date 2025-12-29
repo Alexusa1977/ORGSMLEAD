@@ -17,11 +17,16 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
     ${excludeText}
 
     SEARCH GUIDELINES:
-    1. TARGET: Find people on Instagram, Reddit, X/Twitter, Facebook, and Quora asking for advice, help, or recommendations.
+    1. TARGET: Find people on Facebook, Instagram, Quora, Reddit, and X/Twitter asking for advice, help, or recommendations.
     2. RECENCY: Must be from the last 90 days.
-    3. DATA: Identify the author's username if possible from the search result.
+    3. DATA: Identify the author's username or name if possible.
+    4. PLATFORMS: Focus ONLY on Facebook, Instagram, Quora, Reddit, and X (Twitter). Do NOT include LinkedIn.
 
-    FORMAT: Return a list of high-intent organic opportunities. For Instagram, look for public posts or comments. For Quora, look for specific questions.
+    FORMAT: Return a list of high-intent organic opportunities. 
+    - For Quora, find specific questions.
+    - For Reddit, find subreddit posts.
+    - For Instagram/Facebook, find public discussions or groups.
+    - For X, find tweets or threads.
   `;
 
   try {
@@ -44,12 +49,13 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
         
         const urlLower = url.toLowerCase();
         let platform = "Web";
-        if (urlLower.includes('quora')) platform = 'Quora';
-        else if (urlLower.includes('reddit')) platform = 'Reddit';
-        else if (urlLower.includes('twitter') || urlLower.includes('x.com')) platform = 'X';
-        else if (urlLower.includes('threads')) platform = 'Threads';
-        else if (urlLower.includes('facebook')) platform = 'Facebook';
-        else if (urlLower.includes('instagram')) platform = 'Instagram';
+        
+        if (urlLower.includes('quora.com')) platform = 'Quora';
+        else if (urlLower.includes('reddit.com')) platform = 'Reddit';
+        else if (urlLower.includes('twitter.com') || urlLower.includes('x.com')) platform = 'X';
+        else if (urlLower.includes('facebook.com')) platform = 'Facebook';
+        else if (urlLower.includes('instagram.com')) platform = 'Instagram';
+        else if (urlLower.includes('threads.net')) platform = 'Threads';
 
         const authorMatch = title.split(/[|\-]/)[0]?.trim();
         const author = authorMatch && authorMatch.length < 30 ? authorMatch : undefined;

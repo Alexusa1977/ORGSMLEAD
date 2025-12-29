@@ -38,7 +38,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const getPlatformCount = (platformId: string) => {
-    return leads.filter(l => l.platform.toLowerCase().includes(platformId.toLowerCase())).length;
+    return leads.filter(l => {
+      const plat = l.platform.toLowerCase();
+      const target = platformId.toLowerCase();
+      if (target === 'x') return plat === 'x' || plat === 'twitter';
+      return plat.includes(target);
+    }).length;
   };
 
   const getCollectionCount = (fileId: string) => {
