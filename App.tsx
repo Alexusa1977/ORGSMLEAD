@@ -74,6 +74,7 @@ const App: React.FC = () => {
   }, [files, allLeads, connections]);
 
   const activeFile = files.find(f => f.id === activeFileId) || files[0];
+  const activeConnection = connections.find(c => c.platform === activePlatform);
   const nextdoorConnection = connections.find(c => c.platform === 'nextdoor');
   
   const getFilteredLeads = () => {
@@ -112,7 +113,7 @@ const App: React.FC = () => {
       
       // Inject nextdoor context if connected
       if (platformToScan === 'nextdoor' && nextdoorConnection?.isConnected) {
-        scanFile.location = `${scanFile.location} (Specifically scanning neighborhood: ${nextdoorConnection.accountName})`;
+        scanFile.location = `Neighborhood: ${nextdoorConnection.accountName} (${nextdoorConnection.neighborhoodUrl})`;
       }
 
       const { leads: foundLeads } = await findLeads(scanFile, platformToScan, overrides?.searchGroups, overrides?.targetGroups);
@@ -141,6 +142,14 @@ const App: React.FC = () => {
     ));
   };
 
+  const handleDisconnect = (platform: string) => {
+    setConnections(prev => prev.map(c => 
+      c.platform === platform 
+        ? { ...c, isConnected: false, accountName: undefined, neighborhoodUrl: undefined } 
+        : c
+    ));
+  };
+
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <Sidebar 
@@ -163,12 +172,22 @@ const App: React.FC = () => {
           <h1 className="text-xl font-bold text-slate-800 capitalize">
             {activeView === 'dashboard' ? 'Overview' : activePlatform || activeFile?.name || 'Leads'}
           </h1>
-          {activePlatform === 'nextdoor' && nextdoorConnection?.isConnected && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-100">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              Linked to {nextdoorConnection.accountName}
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            {activePlatform && activeConnection?.isConnected && (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-100">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Linked: {activeConnection.accountName}
+                </div>
+                <button 
+                  onClick={() => handleDisconnect(activePlatform)}
+                  className="px-3 py-1 text-[10px] font-bold text-rose-500 hover:text-rose-700 uppercase tracking-wider transition-colors"
+                >
+                  Disconnect
+                </button>
+              </div>
+            )}
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-8">

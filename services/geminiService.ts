@@ -98,6 +98,9 @@ export const findLeads = async (
       return `site:facebook.com${groupPath}`;
     }).join(' OR ');
     searchStrategy = `Focus on finding RECENT posts (last 30 days) within these specific areas: ${siteLimits}. Look for: ${positiveQueries} ${negativeQueries}`;
+  } else if (specificPlatform === 'nextdoor') {
+    // Nextdoor specific: Location is likely the neighborhood name/url context passed in from App.tsx
+    searchStrategy = `site:nextdoor.com "${positiveQueries}" ${negativeQueries} "recommendation" OR "neighbor" OR "looking for". CONTEXT: ${location}`;
   } else {
     // Broad platform search
     const site = specificPlatform ? `site:${specificPlatform}.com` : '(site:facebook.com OR site:quora.com OR site:reddit.com OR site:nextdoor.com)';
@@ -131,12 +134,17 @@ export const findLeads = async (
     chunks.forEach((chunk: any, index: number) => {
       if (chunk.web?.uri) {
         const url = chunk.web.uri;
-        const platform = url.includes('facebook') ? 'Facebook' : url.includes('quora') ? 'Quora' : 'Web';
+        let platform = 'Web';
+        if (url.includes('facebook')) platform = 'Facebook';
+        else if (url.includes('quora')) platform = 'Quora';
+        else if (url.includes('nextdoor')) platform = 'Nextdoor';
+        else if (url.includes('reddit')) platform = 'Reddit';
+
         foundLeads.set(url.toLowerCase(), {
           id: `lead-c-${Date.now()}-${index}`,
           author: chunk.web.title?.split('-')[0].trim() || "User",
           title: chunk.web.title || "Organic Lead Found",
-          snippet: `Found a match for your keywords in ${location}. This discussion appears to be a high-intent request for services.`,
+          snippet: `Found a match for your keywords. This discussion appears to be a high-intent request for services.`,
           url: url,
           platform: platform,
           relevanceScore: 92,
@@ -153,16 +161,21 @@ export const findLeads = async (
     textUrls.forEach((url, index) => {
       // Filter for platform URLs
       const lowerUrl = url.toLowerCase();
-      if (lowerUrl.includes('facebook.com') || lowerUrl.includes('quora.com') || lowerUrl.includes('reddit.com')) {
+      if (lowerUrl.includes('facebook.com') || lowerUrl.includes('quora.com') || lowerUrl.includes('reddit.com') || lowerUrl.includes('nextdoor.com')) {
         const cleanUrl = url.replace(/[.,)]+$/, '');
         if (!foundLeads.has(cleanUrl.toLowerCase())) {
+          let platform = 'Web';
+          if (cleanUrl.includes('facebook')) platform = 'Facebook';
+          else if (cleanUrl.includes('nextdoor')) platform = 'Nextdoor';
+          else if (cleanUrl.includes('quora')) platform = 'Quora';
+
           foundLeads.set(cleanUrl.toLowerCase(), {
             id: `lead-t-${Date.now()}-${index}`,
             author: "Discussion Participant",
             title: "New Opportunity Found",
             snippet: "Direct link extracted from search analysis matching your monitoring keywords.",
             url: cleanUrl,
-            platform: cleanUrl.includes('facebook') ? 'Facebook' : 'Web',
+            platform: platform,
             relevanceScore: 88,
             detectedAt: Date.now(),
             fileId: file.id,
