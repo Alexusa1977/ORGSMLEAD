@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { KeywordFile, Lead } from '../types';
 import LeadCard from './LeadCard';
 
@@ -8,81 +8,165 @@ interface DashboardProps {
   activePlatform: string | null;
   leads: Lead[];
   isLoading: boolean;
-  onScanClick: () => void;
+  onScanClick: (params?: Partial<KeywordFile>) => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads, isLoading, onScanClick }) => {
   const [showBanner, setShowBanner] = useState(true);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  
+  // Local state for temporary search overrides
+  const [localKeywords, setLocalKeywords] = useState('');
+  const [localLocation, setLocalLocation] = useState('');
+  const [localNiche, setLocalNiche] = useState('');
+
+  // Sync local state when active target changes
+  useEffect(() => {
+    if (activeFile) {
+      setLocalKeywords(activeFile.keywords.join(', '));
+      setLocalLocation(activeFile.location);
+      setLocalNiche(activeFile.niche);
+    } else {
+      // Default placeholders for platform-only views if no collection is active
+      setLocalKeywords('organic leads, help needed');
+      setLocalLocation('Global');
+      setLocalNiche('Business');
+    }
+  }, [activeFile, activePlatform]);
+
+  const handleRunScan = () => {
+    const keywords = localKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    onScanClick({
+      keywords,
+      location: localLocation,
+      niche: localNiche
+    });
+    setIsConfigOpen(false);
+  };
+
+  const downloadCSV = () => {
+    if (leads.length === 0) return;
+    
+    const headers = ['Author', 'Platform', 'Title', 'URL', 'Relevance', 'Date Found', 'Snippet'];
+    const rows = leads.map(l => [
+      `"${(l.author || 'Unknown').replace(/"/g, '""')}"`,
+      `"${l.platform}"`,
+      `"${l.title.replace(/"/g, '""')}"`,
+      `"${l.url}"`,
+      l.relevanceScore,
+      `"${new Date(l.detectedAt).toLocaleDateString()}"`,
+      `"${l.snippet.replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `leads_${activePlatform || activeFile?.name || 'export'}_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
-    <div className="max-w-6xl mx-auto">
-      {activeFile && showBanner && (
-        <div className="mb-8 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+    <div className="max-w-6xl mx-auto pb-20">
+      {/* Search Configuration Panel */}
+      <div className="mb-8 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm transition-all">
+        <button 
+          onClick={() => setIsConfigOpen(!isConfigOpen)}
+          className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-colors"
+        >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
             </div>
-            <p className="text-sm font-medium text-blue-800">
-              Too many posts? <button onClick={onScanClick} className="underline font-bold hover:text-blue-900">Ask AI to find quality leads</button>
-            </p>
+            <div className="text-left">
+              <h3 className="font-bold text-slate-800">Search Parameters</h3>
+              <p className="text-xs text-slate-500">Configure keywords and location for this folder</p>
+            </div>
           </div>
-          <button onClick={() => setShowBanner(false)} className="text-blue-400 hover:text-blue-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
-      )}
+          <svg className={`w-5 h-5 text-slate-400 transition-transform ${isConfigOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+
+        {isConfigOpen && (
+          <div className="p-6 pt-0 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 pt-6">
+              <div className="md:col-span-3">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Keywords (Comma separated)</label>
+                <input 
+                  type="text"
+                  value={localKeywords}
+                  onChange={(e) => setLocalKeywords(e.target.value)}
+                  placeholder="looking for a plumber, recommendation needed, hire a designer..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">City / State</label>
+                <input 
+                  type="text"
+                  value={localLocation}
+                  onChange={(e) => setLocalLocation(e.target.value)}
+                  placeholder="e.g. Austin, TX"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Niche</label>
+                <input 
+                  type="text"
+                  value={localNiche}
+                  onChange={(e) => setLocalNiche(e.target.value)}
+                  placeholder="e.g. Marketing"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"
+                />
+              </div>
+              <div className="flex items-end">
+                <button 
+                  onClick={handleRunScan}
+                  disabled={isLoading}
+                  className="w-full h-[42px] bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-md shadow-indigo-100 flex items-center justify-center gap-2"
+                >
+                  {isLoading ? 'Scanning...' : `Scan ${activePlatform || 'Folder'}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            {activeFile ? activeFile.name : activePlatform ? `All ${activePlatform} Leads` : 'Lead Vault'}
+            {activeFile ? activeFile.name : activePlatform ? `${activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)} Leads` : 'Lead Vault'}
           </h2>
-          {activeFile && (
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Niche:</span>
-                <span className="text-sm font-medium text-slate-600">{activeFile.niche}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Location:</span>
-                <span className="text-sm font-medium text-slate-600">{activeFile.location}</span>
-              </div>
-            </div>
-          )}
+          <div className="flex items-center gap-4 mt-3">
+             <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                {leads.length} Leads found
+             </div>
+             {activePlatform && (
+                <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">{activePlatform} Folder</span>
+             )}
+          </div>
         </div>
-        <div className="text-left md:text-right">
-           <div className="flex flex-wrap gap-2 md:justify-end">
-              {activeFile?.keywords.map((kw, i) => (
-                <span key={i} className="bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full text-[11px] font-bold text-indigo-600 shadow-sm">
-                  {kw}
-                </span>
-              ))}
-              {activePlatform && (
-                <span className="bg-slate-100 border border-slate-200 px-3 py-1 rounded-full text-[11px] font-bold text-slate-600 shadow-sm uppercase tracking-widest">
-                  {activePlatform}
-                </span>
-              )}
-            </div>
+        <div className="flex items-center gap-3">
+           <button 
+             onClick={downloadCSV}
+             disabled={leads.length === 0}
+             className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm"
+           >
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+             Export CSV
+           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              Opportunities History
-              <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs font-bold">{leads.length}</span>
-            </h3>
-            {isLoading && (
-               <div className="flex items-center gap-2 text-indigo-600 text-xs font-bold">
-                 <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                 Searching...
-               </div>
-            )}
-          </div>
-
           {leads.length > 0 ? (
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
               {leads.map(lead => (
                 <LeadCard key={lead.id} lead={lead} />
               ))}
@@ -92,8 +176,8 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
               </div>
-              <h4 className="font-bold text-slate-800 mb-1">No leads found in this folder</h4>
-              <p className="text-sm text-slate-500 mb-6">Run a scan on your keyword collections to find leads for this platform.</p>
+              <h4 className="font-bold text-slate-800 mb-1">No results yet</h4>
+              <p className="text-sm text-slate-500 mb-6">Adjust your parameters above and hit Scan to find new opportunities.</p>
             </div>
           ) : (
              <div className="space-y-4">
@@ -105,18 +189,24 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
         </div>
 
         <div className="space-y-6">
-          <div className="bg-indigo-900 rounded-3xl p-6 text-white shadow-xl">
-             <h4 className="font-bold text-lg mb-4 text-indigo-200">AI Sales Assistant</h4>
+          <div className="bg-indigo-900 rounded-3xl p-6 text-white shadow-xl sticky top-8">
+             <div className="flex items-center gap-3 mb-4">
+               <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                 <svg className="w-5 h-5 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+               </div>
+               <h4 className="font-bold text-lg">Lead Intelligence</h4>
+             </div>
              <p className="text-xs text-indigo-100 mb-6 leading-relaxed opacity-80">
-               "I've categorized your leads into platform folders to help you focus your outreach strategy. Social platform norms vary, so use the 'AI Idea' button on each lead for tailored advice."
+               Configure your search specifically for <strong>{activePlatform || 'this collection'}</strong>. Use localized keywords for better accuracy in specific cities or states.
              </p>
-             <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                <div className="flex justify-between text-xs font-bold mb-2">
-                   <span>Lead Health</span>
-                   <span className="text-green-400">Stable</span>
+             <div className="space-y-3">
+                <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between">
+                   <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">Scanning Scope</span>
+                   <span className="text-xs font-bold">{activePlatform || 'Cross-Platform'}</span>
                 </div>
-                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                   <div className="h-full bg-indigo-500 w-2/3"></div>
+                <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between">
+                   <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">Target Location</span>
+                   <span className="text-xs font-bold truncate max-w-[100px]">{localLocation}</span>
                 </div>
              </div>
           </div>
