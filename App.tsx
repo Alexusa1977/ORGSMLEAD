@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { KeywordFile, Lead, LeadStatus } from './types';
+import { KeywordFile, Lead, LeadStatus, FacebookGroup } from './types';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import OverviewDashboard from './components/OverviewDashboard';
@@ -113,22 +113,21 @@ const App: React.FC = () => {
     setDialogMode(null);
   };
 
-  const handleRefreshLeads = useCallback(async (overrides?: Partial<KeywordFile>) => {
+  const handleRefreshLeads = useCallback(async (overrides?: Partial<KeywordFile> & { searchGroups?: boolean, targetGroups?: FacebookGroup[] }) => {
     if (!activeFile) return;
     setIsRefreshing(true);
     try {
-      // Use active collection but apply any inline overrides from the dashboard
       const scanFile = { ...activeFile, ...overrides };
       const platformToScan = activeView === 'platform' ? activePlatform : undefined;
+      const searchGroups = overrides?.searchGroups || false;
+      const targetGroups = overrides?.targetGroups || [];
       
-      const { leads: foundLeads } = await findLeads(scanFile, platformToScan);
+      const { leads: foundLeads } = await findLeads(scanFile, platformToScan, searchGroups, targetGroups);
       
       setAllLeads(prev => {
         const existingUrls = new Set(prev.map(l => l.url));
         const uniqueNewLeads = foundLeads.filter(l => !existingUrls.has(l.url)).map(l => ({
           ...l,
-          // If we are in a collection view, tag it with that fileId. 
-          // If platform view, tag it with the activeFileId (which defaults to first collection)
           fileId: activeFileId || activeFile.id,
           status: 'to_be_outreached' as LeadStatus
         }));
@@ -184,12 +183,12 @@ const App: React.FC = () => {
             </h1>
             {activeView === 'platform' && activePlatform && (
               <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                Platform Sync
+                Platform Scan
               </span>
             )}
             {activeView === 'collection' && activeFileId && (
               <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                Collection Sync
+                Collection Scan
               </span>
             )}
           </div>

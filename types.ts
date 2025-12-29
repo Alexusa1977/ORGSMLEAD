@@ -9,6 +9,14 @@ export interface KeywordFile {
   createdAt: number;
 }
 
+export interface FacebookGroup {
+  id: string;
+  name: string;
+  url: string;
+  memberCount?: string;
+  niche: string;
+}
+
 export type LeadStatus = 'to_be_outreached' | 'outreached' | 'followed_up' | 'replied';
 
 export interface Lead {

@@ -1,24 +1,28 @@
 
 import React, { useState, useEffect } from 'react';
-import { KeywordFile, Lead } from '../types';
+import { KeywordFile, Lead, FacebookGroup } from '../types';
 import LeadCard from './LeadCard';
+import { findFacebookGroups } from '../services/geminiService';
 
 interface DashboardProps {
   activeFile: KeywordFile | null;
   activePlatform: string | null;
   leads: Lead[];
   isLoading: boolean;
-  onScanClick: (params?: Partial<KeywordFile>) => void;
+  onScanClick: (params?: Partial<KeywordFile> & { searchGroups?: boolean; targetGroups?: FacebookGroup[] }) => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads, isLoading, onScanClick }) => {
-  const [showBanner, setShowBanner] = useState(true);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isFindingGroups, setIsFindingGroups] = useState(false);
+  const [discoveredGroups, setDiscoveredGroups] = useState<FacebookGroup[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   
   // Local state for temporary search overrides
   const [localKeywords, setLocalKeywords] = useState('');
   const [localLocation, setLocalLocation] = useState('');
   const [localNiche, setLocalNiche] = useState('');
+  const [searchGroupsToggle, setSearchGroupsToggle] = useState(false);
 
   // Sync local state when active target changes
   useEffect(() => {
@@ -27,26 +31,61 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
       setLocalLocation(activeFile.location);
       setLocalNiche(activeFile.niche);
     } else {
-      // Default placeholders for platform-only views if no collection is active
       setLocalKeywords('organic leads, help needed');
       setLocalLocation('Global');
       setLocalNiche('Business');
     }
+    // Reset groups when switching view
+    setDiscoveredGroups([]);
+    setSelectedGroupIds(new Set());
   }, [activeFile, activePlatform]);
 
   const handleRunScan = () => {
     const keywords = localKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    const targetGroups = discoveredGroups.filter(g => selectedGroupIds.has(g.id));
+    
     onScanClick({
       keywords,
       location: localLocation,
-      niche: localNiche
+      niche: localNiche,
+      searchGroups: activePlatform === 'facebook' ? (searchGroupsToggle || targetGroups.length > 0) : false,
+      targetGroups: targetGroups.length > 0 ? targetGroups : undefined
     });
     setIsConfigOpen(false);
   };
 
+  const handleFindGroups = async () => {
+    if (!localNiche) return;
+    setIsFindingGroups(true);
+    try {
+      const groups = await findFacebookGroups(localNiche, localLocation);
+      setDiscoveredGroups(groups);
+      // Auto-select all by default
+      setSelectedGroupIds(new Set(groups.map(g => g.id)));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsFindingGroups(false);
+    }
+  };
+
+  const toggleGroup = (id: string) => {
+    const next = new Set(selectedGroupIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedGroupIds(next);
+  };
+
+  const toggleAllGroups = () => {
+    if (selectedGroupIds.size === discoveredGroups.length) {
+      setSelectedGroupIds(new Set());
+    } else {
+      setSelectedGroupIds(new Set(discoveredGroups.map(g => g.id)));
+    }
+  };
+
   const downloadCSV = () => {
     if (leads.length === 0) return;
-    
     const headers = ['Author', 'Platform', 'Title', 'URL', 'Relevance', 'Date Found', 'Snippet'];
     const rows = leads.map(l => [
       `"${(l.author || 'Unknown').replace(/"/g, '""')}"`,
@@ -57,7 +96,6 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
       `"${new Date(l.detectedAt).toLocaleDateString()}"`,
       `"${l.snippet.replace(/"/g, '""')}"`
     ]);
-
     const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -83,7 +121,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
             </div>
             <div className="text-left">
               <h3 className="font-bold text-slate-800">Search Parameters</h3>
-              <p className="text-xs text-slate-500">Configure keywords and location for this folder</p>
+              <p className="text-xs text-slate-500">Target specific keywords, cities, and niche communities</p>
             </div>
           </div>
           <svg className={`w-5 h-5 text-slate-400 transition-transform ${isConfigOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -91,15 +129,15 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
 
         {isConfigOpen && (
           <div className="p-6 pt-0 border-t border-slate-100 animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 pt-6">
               <div className="md:col-span-3">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Keywords (Comma separated)</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Keywords</label>
                 <input 
                   type="text"
                   value={localKeywords}
                   onChange={(e) => setLocalKeywords(e.target.value)}
-                  placeholder="looking for a plumber, recommendation needed, hire a designer..."
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"
+                  placeholder="looking for recommendations, need help with..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                 />
               </div>
               <div>
@@ -109,29 +147,80 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
                   value={localLocation}
                   onChange={(e) => setLocalLocation(e.target.value)}
                   placeholder="e.g. Austin, TX"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Niche</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Niche / Industry</label>
                 <input 
                   type="text"
                   value={localNiche}
                   onChange={(e) => setLocalNiche(e.target.value)}
-                  placeholder="e.g. Marketing"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"
+                  placeholder="e.g. Home Services"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
                 />
               </div>
               <div className="flex items-end">
                 <button 
                   onClick={handleRunScan}
                   disabled={isLoading}
-                  className="w-full h-[42px] bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-md shadow-indigo-100 flex items-center justify-center gap-2"
+                  className="w-full h-[42px] bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                 >
-                  {isLoading ? 'Scanning...' : `Scan ${activePlatform || 'Folder'}`}
+                  {isLoading ? 'Scanning...' : `Run Extraction`}
                 </button>
               </div>
             </div>
+
+            {activePlatform === 'facebook' && (
+              <div className="mt-6 p-5 bg-slate-50 rounded-2xl border border-slate-200">
+                <div className="flex items-center justify-between mb-4">
+                   <div>
+                     <h4 className="text-sm font-bold text-slate-800">Target Communities</h4>
+                     <p className="text-[10px] text-slate-500">Discover and select specific Facebook groups to scan</p>
+                   </div>
+                   <button 
+                     onClick={handleFindGroups}
+                     disabled={isFindingGroups || !localNiche}
+                     className="px-3 py-1.5 bg-white border border-slate-300 text-indigo-600 rounded-lg text-[10px] font-bold hover:bg-indigo-50 transition-all flex items-center gap-2"
+                   >
+                     {isFindingGroups && <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+                     Find Public Groups
+                   </button>
+                </div>
+
+                {discoveredGroups.length > 0 && (
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                    <button 
+                      onClick={toggleAllGroups}
+                      className="text-[10px] font-bold text-indigo-600 hover:underline mb-1"
+                    >
+                      {selectedGroupIds.size === discoveredGroups.length ? 'Deselect All' : 'Select All Groups'}
+                    </button>
+                    {discoveredGroups.map(group => (
+                      <div 
+                        key={group.id} 
+                        onClick={() => toggleGroup(group.id)}
+                        className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${selectedGroupIds.has(group.id) ? 'bg-white border-indigo-200 shadow-sm' : 'bg-transparent border-transparent opacity-60 hover:opacity-100'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedGroupIds.has(group.id) ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'}`}>
+                            {selectedGroupIds.has(group.id) && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
+                          </div>
+                          <span className="text-xs font-medium text-slate-700 truncate max-w-[300px]">{group.name}</span>
+                        </div>
+                        <a href={group.url} target="_blank" onClick={(e) => e.stopPropagation()} className="text-[10px] text-slate-400 hover:text-indigo-600 underline">View Group</a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {discoveredGroups.length === 0 && !isFindingGroups && (
+                  <div className="py-6 text-center border-2 border-dashed border-slate-200 rounded-xl">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">No target groups found</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -144,10 +233,10 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
           <div className="flex items-center gap-4 mt-3">
              <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-600">
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                {leads.length} Leads found
+                {leads.length} Active Leads
              </div>
-             {activePlatform && (
-                <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">{activePlatform} Folder</span>
+             {selectedGroupIds.size > 0 && activePlatform === 'facebook' && (
+                <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Targeting {selectedGroupIds.size} Communities</span>
              )}
           </div>
         </div>
@@ -158,7 +247,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
              className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm"
            >
              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-             Export CSV
+             Export Leads
            </button>
         </div>
       </div>
@@ -176,8 +265,8 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
               </div>
-              <h4 className="font-bold text-slate-800 mb-1">No results yet</h4>
-              <p className="text-sm text-slate-500 mb-6">Adjust your parameters above and hit Scan to find new opportunities.</p>
+              <h4 className="font-bold text-slate-800 mb-1">Waiting for scan</h4>
+              <p className="text-sm text-slate-500 mb-6">Hit 'Run Extraction' above to start searching for niche-specific leads.</p>
             </div>
           ) : (
              <div className="space-y-4">
@@ -194,19 +283,19 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
                  <svg className="w-5 h-5 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                </div>
-               <h4 className="font-bold text-lg">Lead Intelligence</h4>
+               <h4 className="font-bold text-lg">Smart Monitoring</h4>
              </div>
              <p className="text-xs text-indigo-100 mb-6 leading-relaxed opacity-80">
-               Configure your search specifically for <strong>{activePlatform || 'this collection'}</strong>. Use localized keywords for better accuracy in specific cities or states.
+               Target specific <strong>public communities</strong> where high-intent conversations happen. For Facebook, discovery works best when targeting groups by niche + location.
              </p>
              <div className="space-y-3">
                 <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between">
-                   <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">Scanning Scope</span>
-                   <span className="text-xs font-bold">{activePlatform || 'Cross-Platform'}</span>
+                   <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">Active Platform</span>
+                   <span className="text-xs font-bold">{activePlatform || 'Multi-channel'}</span>
                 </div>
                 <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between">
-                   <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">Target Location</span>
-                   <span className="text-xs font-bold truncate max-w-[100px]">{localLocation}</span>
+                   <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">Group Targeting</span>
+                   <span className="text-xs font-bold">{selectedGroupIds.size > 0 ? 'Selected List' : 'General Niche'}</span>
                 </div>
              </div>
           </div>
