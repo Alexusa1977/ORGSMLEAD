@@ -33,15 +33,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     { name: 'Facebook', id: 'facebook', icon: 'f' },
     { name: 'Instagram', id: 'instagram', icon: 'ig' },
     { name: 'Quora', id: 'quora', icon: 'q' },
-    { name: 'X / Twitter', id: 'x', icon: 'x' },
-    { name: 'Reddit', id: 'reddit', icon: 'r' },
   ];
 
   const getPlatformCount = (platformId: string) => {
     return leads.filter(l => {
       const plat = l.platform.toLowerCase();
       const target = platformId.toLowerCase();
-      if (target === 'x') return plat === 'x' || plat === 'twitter';
       return plat.includes(target);
     }).length;
   };

@@ -10,13 +10,6 @@ interface OverviewDashboardProps {
 
 const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads, onPlatformClick }) => {
   const getCountByPlatform = (platform: string) => {
-    // Be inclusive with platform naming (e.g., 'X' or 'Twitter')
-    if (platform.toLowerCase() === 'x') {
-      return leads.filter(l => 
-        l.platform.toLowerCase() === 'x' || 
-        l.platform.toLowerCase() === 'twitter'
-      ).length;
-    }
     return leads.filter(l => l.platform.toLowerCase().includes(platform.toLowerCase())).length;
   };
 
@@ -26,8 +19,6 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads, onPlatform
     { name: 'Facebook', id: 'facebook', count: getCountByPlatform('facebook'), icon: 'F', color: 'bg-blue-600' },
     { name: 'Quora', id: 'quora', count: getCountByPlatform('quora'), icon: 'Q', color: 'bg-red-700' },
     { name: 'Instagram', id: 'instagram', count: getCountByPlatform('instagram'), icon: 'Ig', color: 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600' },
-    { name: 'Twitter/X', id: 'x', count: getCountByPlatform('x'), icon: 'X', color: 'bg-slate-900' },
-    { name: 'Reddit', id: 'reddit', count: getCountByPlatform('reddit'), icon: 'R', color: 'bg-orange-600' },
   ];
 
   const stats = [
