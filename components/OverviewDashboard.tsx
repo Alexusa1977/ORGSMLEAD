@@ -24,7 +24,7 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads, onPlatform
 
   const platforms = [
     { name: 'Facebook', id: 'facebook', count: getCountByPlatform('facebook'), icon: 'F', color: 'bg-blue-600' },
-    { name: 'LinkedIn', id: 'linkedin', count: getCountByPlatform('linkedin'), icon: 'In', color: 'bg-blue-700' },
+    { name: 'Quora', id: 'quora', count: getCountByPlatform('quora'), icon: 'Q', color: 'bg-red-700' },
     { name: 'Instagram', id: 'instagram', count: getCountByPlatform('instagram'), icon: 'Ig', color: 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600' },
     { name: 'Twitter/X', id: 'x', count: getCountByPlatform('x'), icon: 'X', color: 'bg-slate-900' },
     { name: 'Reddit', id: 'reddit', count: getCountByPlatform('reddit'), icon: 'R', color: 'bg-orange-600' },

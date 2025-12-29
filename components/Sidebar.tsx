@@ -31,8 +31,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const platforms = [
     { name: 'Facebook', id: 'facebook', icon: 'f' },
-    { name: 'LinkedIn', id: 'linkedin', icon: 'in' },
     { name: 'Instagram', id: 'instagram', icon: 'ig' },
+    { name: 'Quora', id: 'quora', icon: 'q' },
     { name: 'X / Twitter', id: 'x', icon: 'x' },
     { name: 'Reddit', id: 'reddit', icon: 'r' },
   ];

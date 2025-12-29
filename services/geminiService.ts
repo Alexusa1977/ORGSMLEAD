@@ -17,11 +17,11 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
     ${excludeText}
 
     SEARCH GUIDELINES:
-    1. TARGET: Find people on Instagram, Reddit, X/Twitter, LinkedIn, Threads, and Quora asking for advice, help, or recommendations.
+    1. TARGET: Find people on Instagram, Reddit, X/Twitter, Facebook, and Quora asking for advice, help, or recommendations.
     2. RECENCY: Must be from the last 90 days.
     3. DATA: Identify the author's username if possible from the search result.
 
-    FORMAT: Return a list of high-intent organic opportunities. For Instagram, look for public posts or comments.
+    FORMAT: Return a list of high-intent organic opportunities. For Instagram, look for public posts or comments. For Quora, look for specific questions.
   `;
 
   try {
@@ -44,11 +44,10 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
         
         const urlLower = url.toLowerCase();
         let platform = "Web";
-        if (urlLower.includes('linkedin')) platform = 'LinkedIn';
+        if (urlLower.includes('quora')) platform = 'Quora';
         else if (urlLower.includes('reddit')) platform = 'Reddit';
         else if (urlLower.includes('twitter') || urlLower.includes('x.com')) platform = 'X';
         else if (urlLower.includes('threads')) platform = 'Threads';
-        else if (urlLower.includes('quora')) platform = 'Quora';
         else if (urlLower.includes('facebook')) platform = 'Facebook';
         else if (urlLower.includes('instagram')) platform = 'Instagram';
 
