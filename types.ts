@@ -11,6 +11,8 @@ export interface KeywordFile {
 
 export interface Lead {
   id: string;
+  author?: string;
+  authorAvatar?: string;
   title: string;
   snippet: string;
   url: string;

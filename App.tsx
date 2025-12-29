@@ -9,17 +9,18 @@ import { findLeads } from './services/geminiService';
 const App: React.FC = () => {
   const [files, setFiles] = useState<KeywordFile[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Initialize with migration for old data structures
+  // Initialize data
   useEffect(() => {
     const savedFiles = localStorage.getItem('lead_sync_files');
+    const savedLeads = localStorage.getItem('lead_sync_leads');
+    
     if (savedFiles) {
       try {
         let parsed = JSON.parse(savedFiles);
-        // Data Migration: Ensure all files have required arrays even if created on older versions
         const migrated = parsed.map((f: any) => ({
           ...f,
           keywords: f.keywords || [],
@@ -27,9 +28,7 @@ const App: React.FC = () => {
         }));
         setFiles(migrated);
         if (migrated.length > 0) setActiveFileId(migrated[0].id);
-      } catch (e) {
-        console.error("Failed to parse saved files", e);
-      }
+      } catch (e) { console.error(e); }
     } else {
       const defaultFile: KeywordFile = {
         id: 'default-1',
@@ -43,15 +42,25 @@ const App: React.FC = () => {
       setFiles([defaultFile]);
       setActiveFileId(defaultFile.id);
     }
+
+    if (savedLeads) {
+      try {
+        setAllLeads(JSON.parse(savedLeads));
+      } catch (e) { console.error(e); }
+    }
   }, []);
 
+  // Save data
   useEffect(() => {
-    if (files.length > 0) {
-      localStorage.setItem('lead_sync_files', JSON.stringify(files));
-    }
+    if (files.length > 0) localStorage.setItem('lead_sync_files', JSON.stringify(files));
   }, [files]);
 
+  useEffect(() => {
+    localStorage.setItem('lead_sync_leads', JSON.stringify(allLeads));
+  }, [allLeads]);
+
   const activeFile = files.find(f => f.id === activeFileId);
+  const activeLeads = allLeads.filter(l => l.fileId === activeFileId).sort((a, b) => b.detectedAt - a.detectedAt);
 
   const handleCreateFile = (newFileData: Omit<KeywordFile, 'id' | 'createdAt'>) => {
     const file: KeywordFile = {
@@ -77,7 +86,13 @@ const App: React.FC = () => {
     setIsRefreshing(true);
     try {
       const { leads: foundLeads } = await findLeads(activeFile);
-      setLeads(foundLeads);
+      
+      setAllLeads(prev => {
+        // Only add leads that aren't already in the list for this file (check by URL)
+        const existingUrls = new Set(prev.filter(l => l.fileId === activeFile.id).map(l => l.url));
+        const uniqueNewLeads = foundLeads.filter(l => !existingUrls.has(l.url));
+        return [...prev, ...uniqueNewLeads];
+      });
     } catch (error) {
       console.error(error);
     } finally {
@@ -85,18 +100,18 @@ const App: React.FC = () => {
     }
   }, [activeFile]);
 
-  useEffect(() => {
-    if (activeFileId) {
-      handleRefreshLeads();
-    }
-  }, [activeFileId]);
-
   const handleDeleteFile = (id: string) => {
     const newFiles = files.filter(f => f.id !== id);
     setFiles(newFiles);
+    setAllLeads(prev => prev.filter(l => l.fileId !== id));
     if (activeFileId === id) {
       setActiveFileId(newFiles.length > 0 ? newFiles[0].id : null);
     }
+  };
+
+  const handleClearLeads = () => {
+    if (!activeFileId) return;
+    setAllLeads(prev => prev.filter(l => l.fileId !== activeFileId));
   };
 
   return (
@@ -107,10 +122,7 @@ const App: React.FC = () => {
         onSelectFile={setActiveFileId} 
         onCreateClick={() => setDialogMode('create')}
         onDeleteFile={handleDeleteFile}
-        onEditFile={(id) => {
-            setActiveFileId(id);
-            setDialogMode('edit');
-        }}
+        onEditFile={(id) => { setActiveFileId(id); setDialogMode('edit'); }}
       />
       
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -125,26 +137,34 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-4">
             {activeFile && (
+              <>
+                <button 
+                  onClick={handleClearLeads}
+                  className="px-3 py-2 text-slate-400 hover:text-red-500 text-xs font-medium transition-colors"
+                >
+                  Clear History
+                </button>
                 <button 
                   onClick={() => setDialogMode('edit')}
                   className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-colors"
-                  title="Edit Collection Settings"
+                  title="Edit Settings"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 </button>
+              </>
             )}
             <button 
               onClick={handleRefreshLeads}
               disabled={isRefreshing || !activeFile}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm"
             >
-              {isRefreshing ? (
+              {isRefreshing && (
                 <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-              ) : null}
-              {isRefreshing ? 'Searching...' : 'Scan for Leads'}
+              )}
+              {isRefreshing ? 'Scanning...' : 'Scan New Leads'}
             </button>
           </div>
         </header>
@@ -152,8 +172,9 @@ const App: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-8">
           <Dashboard 
             activeFile={activeFile || null} 
-            leads={leads} 
+            leads={activeLeads} 
             isLoading={isRefreshing}
+            onScanClick={handleRefreshLeads}
           />
         </div>
       </main>
