@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { KeywordFile, Lead } from './types';
+import { KeywordFile, Lead, LeadStatus } from './types';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import OverviewDashboard from './components/OverviewDashboard';
@@ -10,8 +10,9 @@ import { findLeads } from './services/geminiService';
 const App: React.FC = () => {
   const [files, setFiles] = useState<KeywordFile[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [activePlatform, setActivePlatform] = useState<string | null>(null);
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
-  const [activeView, setActiveView] = useState<'dashboard' | 'outreach' | 'settings' | 'collection'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'outreach' | 'settings' | 'collection' | 'platform'>('dashboard');
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -46,8 +47,11 @@ const App: React.FC = () => {
     if (savedLeads) {
       try {
         const parsedLeads = JSON.parse(savedLeads);
-        // Ensure all leads have a status
-        setAllLeads(parsedLeads.map((l: any) => ({ ...l, status: l.status || 'to_be_outreached' })));
+        setAllLeads(parsedLeads.map((l: any) => ({ 
+          ...l, 
+          status: l.status || 'to_be_outreached',
+          detectedAt: l.detectedAt || Date.now()
+        })));
       } catch (e) { console.error(e); }
     }
   }, []);
@@ -62,7 +66,20 @@ const App: React.FC = () => {
   }, [allLeads]);
 
   const activeFile = files.find(f => f.id === activeFileId);
-  const activeLeads = allLeads.filter(l => l.fileId === activeFileId).sort((a, b) => b.detectedAt - a.detectedAt);
+  
+  // Filtering logic
+  const getFilteredLeads = () => {
+    if (activeView === 'dashboard') return allLeads.sort((a, b) => b.detectedAt - a.detectedAt).slice(0, 10);
+    if (activeView === 'platform' && activePlatform) {
+      return allLeads.filter(l => l.platform.toLowerCase() === activePlatform.toLowerCase());
+    }
+    if (activeView === 'collection' && activeFileId) {
+      return allLeads.filter(l => l.fileId === activeFileId);
+    }
+    return allLeads;
+  };
+
+  const currentLeads = getFilteredLeads().sort((a, b) => b.detectedAt - a.detectedAt);
 
   const handleCreateFile = (newFileData: Omit<KeywordFile, 'id' | 'createdAt'>) => {
     const file: KeywordFile = {
@@ -91,10 +108,10 @@ const App: React.FC = () => {
       const { leads: foundLeads } = await findLeads(activeFile);
       
       setAllLeads(prev => {
-        const existingUrls = new Set(prev.filter(l => l.fileId === activeFile.id).map(l => l.url));
+        const existingUrls = new Set(prev.map(l => l.url));
         const uniqueNewLeads = foundLeads.filter(l => !existingUrls.has(l.url)).map(l => ({
           ...l,
-          status: 'to_be_outreached' as const
+          status: 'to_be_outreached' as LeadStatus
         }));
         return [...prev, ...uniqueNewLeads];
       });
@@ -115,9 +132,10 @@ const App: React.FC = () => {
     }
   };
 
-  const handleClearLeads = () => {
-    if (!activeFileId) return;
-    setAllLeads(prev => prev.filter(l => l.fileId !== activeFileId));
+  const handleNavigateToPlatform = (platform: string) => {
+    setActivePlatform(platform);
+    setActiveFileId(null);
+    setActiveView('platform');
   };
 
   return (
@@ -125,7 +143,9 @@ const App: React.FC = () => {
       <Sidebar 
         files={files} 
         activeFileId={activeFileId} 
-        onSelectFile={setActiveFileId} 
+        activePlatform={activePlatform}
+        onSelectFile={(id) => { setActiveFileId(id); setActivePlatform(null); setActiveView('collection'); }}
+        onSelectPlatform={handleNavigateToPlatform}
         onCreateClick={() => setDialogMode('create')}
         onDeleteFile={handleDeleteFile}
         onEditFile={(id) => { setActiveFileId(id); setDialogMode('edit'); }}
@@ -137,40 +157,32 @@ const App: React.FC = () => {
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold text-slate-800">
-              {activeView === 'dashboard' ? 'Dashboard Overview' : 
-               activeView === 'outreach' ? 'All Leads & Outreach' :
-               activeView === 'settings' ? 'Global Settings' :
+              {activeView === 'dashboard' ? 'Overview' : 
+               activeView === 'platform' ? `${activePlatform} Leads` :
+               activeView === 'outreach' ? 'All Leads' :
                activeFile?.name}
             </h1>
             {activeView === 'collection' && activeFile && (
               <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-xs font-bold">
-                Active Collection
+                Scanning Keywords
               </span>
             )}
           </div>
           <div className="flex items-center gap-4">
             {activeView === 'collection' && activeFile && (
-              <>
-                <button 
-                  onClick={handleClearLeads}
-                  className="px-3 py-2 text-slate-400 hover:text-red-500 text-xs font-medium transition-colors"
-                >
-                  Clear History
-                </button>
-                <button 
-                  onClick={handleRefreshLeads}
-                  disabled={isRefreshing}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm"
-                >
-                  {isRefreshing && (
-                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  )}
-                  {isRefreshing ? 'Scanning...' : 'Scan New Leads'}
-                </button>
-              </>
+              <button 
+                onClick={handleRefreshLeads}
+                disabled={isRefreshing}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm"
+              >
+                {isRefreshing && (
+                  <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {isRefreshing ? 'Scanning...' : 'Scan New Leads'}
+              </button>
             )}
           </div>
         </header>
@@ -178,18 +190,14 @@ const App: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-8">
           {activeView === 'dashboard' ? (
             <OverviewDashboard leads={allLeads} />
-          ) : activeView === 'collection' ? (
+          ) : (
             <Dashboard 
               activeFile={activeFile || null} 
-              leads={activeLeads} 
+              activePlatform={activePlatform}
+              leads={currentLeads} 
               isLoading={isRefreshing}
               onScanClick={handleRefreshLeads}
             />
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-4">
-              <svg className="w-16 h-16 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-              <p className="font-medium italic">This view is currently under construction.</p>
-            </div>
           )}
         </div>
       </main>

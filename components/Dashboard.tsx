@@ -5,29 +5,18 @@ import LeadCard from './LeadCard';
 
 interface DashboardProps {
   activeFile: KeywordFile | null;
+  activePlatform: string | null;
   leads: Lead[];
   isLoading: boolean;
   onScanClick: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ activeFile, leads, isLoading, onScanClick }) => {
+const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads, isLoading, onScanClick }) => {
   const [showBanner, setShowBanner] = useState(true);
-
-  if (!activeFile) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto">
-        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 mb-6">
-          <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-        </div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-2">Ready to find leads?</h2>
-        <p className="text-slate-500 mb-8">Create a new collection to start monitoring organic opportunities across social media.</p>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-6xl mx-auto">
-      {showBanner && (
+      {activeFile && showBanner && (
         <div className="mb-8 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
@@ -45,25 +34,34 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, leads, isLoading, onS
 
       <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">{activeFile.name}</h2>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Niche:</span>
-              <span className="text-sm font-medium text-slate-600">{activeFile.niche}</span>
+          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+            {activeFile ? activeFile.name : activePlatform ? `All ${activePlatform} Leads` : 'Lead Vault'}
+          </h2>
+          {activeFile && (
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Niche:</span>
+                <span className="text-sm font-medium text-slate-600">{activeFile.niche}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Location:</span>
+                <span className="text-sm font-medium text-slate-600">{activeFile.location}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Location:</span>
-              <span className="text-sm font-medium text-slate-600">{activeFile.location}</span>
-            </div>
-          </div>
+          )}
         </div>
         <div className="text-left md:text-right">
            <div className="flex flex-wrap gap-2 md:justify-end">
-              {activeFile.keywords.map((kw, i) => (
+              {activeFile?.keywords.map((kw, i) => (
                 <span key={i} className="bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full text-[11px] font-bold text-indigo-600 shadow-sm">
                   {kw}
                 </span>
               ))}
+              {activePlatform && (
+                <span className="bg-slate-100 border border-slate-200 px-3 py-1 rounded-full text-[11px] font-bold text-slate-600 shadow-sm uppercase tracking-widest">
+                  {activePlatform}
+                </span>
+              )}
             </div>
         </div>
       </div>
@@ -73,7 +71,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, leads, isLoading, onS
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               Opportunities History
-              <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs font-bold">{leads.length}</span>
+              <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs font-bold">{leads.length}</span>
             </h3>
             {isLoading && (
                <div className="flex items-center gap-2 text-indigo-600 text-xs font-bold">
@@ -90,9 +88,12 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, leads, isLoading, onS
               ))}
             </div>
           ) : !isLoading ? (
-            <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-12 text-center">
-              <h4 className="font-bold text-slate-800 mb-1">No leads saved yet</h4>
-              <p className="text-sm text-slate-500 mb-6">Click "Scan New Leads" to populate your history.</p>
+            <div className="bg-white border border-dashed border-slate-300 rounded-3xl p-16 text-center">
+              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+              </div>
+              <h4 className="font-bold text-slate-800 mb-1">No leads found in this folder</h4>
+              <p className="text-sm text-slate-500 mb-6">Run a scan on your keyword collections to find leads for this platform.</p>
             </div>
           ) : (
              <div className="space-y-4">
@@ -104,19 +105,20 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, leads, isLoading, onS
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <svg className="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path><path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"></path></svg>
-              Platforms Coverage
-            </h3>
-            <div className="space-y-3">
-                {['Reddit', 'X/Twitter', 'LinkedIn', 'Threads', 'Bluesky', 'Telegram'].map(p => (
-                   <div key={p} className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-500 font-medium">{p}</span>
-                      <span className="text-indigo-600 font-bold px-1.5 py-0.5 bg-indigo-50 rounded">MONITORED</span>
-                   </div>
-                ))}
-            </div>
+          <div className="bg-indigo-900 rounded-3xl p-6 text-white shadow-xl">
+             <h4 className="font-bold text-lg mb-4 text-indigo-200">AI Sales Assistant</h4>
+             <p className="text-xs text-indigo-100 mb-6 leading-relaxed opacity-80">
+               "I've categorized your leads into platform folders to help you focus your outreach strategy. Social platform norms vary, so use the 'AI Idea' button on each lead for tailored advice."
+             </p>
+             <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                <div className="flex justify-between text-xs font-bold mb-2">
+                   <span>Lead Health</span>
+                   <span className="text-green-400">Stable</span>
+                </div>
+                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                   <div className="h-full bg-indigo-500 w-2/3"></div>
+                </div>
+             </div>
           </div>
         </div>
       </div>

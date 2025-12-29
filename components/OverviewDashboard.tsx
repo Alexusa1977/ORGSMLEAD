@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Lead } from '../types';
+import LeadCard from './LeadCard';
 
 interface OverviewDashboardProps {
   leads: Lead[];
@@ -24,6 +25,8 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
     { label: 'Replied', value: getCountByStatus('replied'), sub: 'Hot leads' },
   ];
 
+  const recentLeads = leads.sort((a, b) => b.detectedAt - a.detectedAt).slice(0, 5);
+
   return (
     <div className="max-w-6xl mx-auto space-y-12 py-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -41,7 +44,7 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
                    <span className="text-sm font-semibold text-indigo-800">leads</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full ${p.color} flex items-center justify-center text-white text-xs font-bold`}>
+                  <div className={`w-8 h-8 rounded-full ${p.color} flex items-center justify-center text-white text-xs font-bold shadow-sm`}>
                     {p.icon}
                   </div>
                   <span className="text-sm font-medium text-slate-600">{p.name}</span>
@@ -53,14 +56,14 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
             <div className="bg-white/50 p-6 rounded-2xl border border-dashed border-slate-200 flex flex-col justify-center items-start group hover:bg-white transition-all cursor-pointer">
               <span className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest">Connect</span>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">n</div>
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-[10px] font-bold uppercase shadow-sm">n</div>
                 <span className="text-sm font-medium text-slate-400 group-hover:text-slate-600">Nextdoor</span>
               </div>
             </div>
             <div className="bg-white/50 p-6 rounded-2xl border border-dashed border-slate-200 flex flex-col justify-center items-start group hover:bg-white transition-all cursor-pointer">
               <span className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest">Connect</span>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">w</div>
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-[10px] font-bold uppercase shadow-sm">w</div>
                 <span className="text-sm font-medium text-slate-400 group-hover:text-slate-600">Whatsapp</span>
               </div>
             </div>
@@ -74,7 +77,7 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
           </h3>
           <div className="grid grid-cols-2 gap-4">
             {stats.map((s) => (
-              <div key={s.label} className="bg-white/40 p-6 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center">
+              <div key={s.label} className="bg-white/40 p-6 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center backdrop-blur-sm">
                 <span className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-wider">{s.label}</span>
                 <span className="text-3xl font-bold text-indigo-900 mb-1">{s.value > 1000 ? (s.value / 1000).toFixed(1) + 'K' : s.value}</span>
                 <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">{s.sub}</span>
@@ -85,15 +88,34 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
 
       </div>
 
-      {/* Quick Action Banner */}
-      <div className="bg-indigo-600 rounded-3xl p-8 text-white relative overflow-hidden shadow-xl">
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="max-w-lg">
-            <h4 className="text-2xl font-bold mb-2">Grow your business organically.</h4>
-            <p className="text-indigo-100 text-sm opacity-90">LeadSync uses AI to monitor communities where your customers hang out. Stop paying for ads and start participating in conversations.</p>
+      {/* Recent Activity Section */}
+      <section className="space-y-6">
+        <div className="flex items-center justify-between">
+           <h3 className="text-lg font-bold text-slate-800">Latest Discoveries</h3>
+           <p className="text-xs font-medium text-slate-400">Showing top {recentLeads.length} matches across all folders</p>
+        </div>
+        {recentLeads.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {recentLeads.map(lead => (
+              <LeadCard key={lead.id} lead={lead} />
+            ))}
           </div>
-          <button className="bg-white text-indigo-600 px-8 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-colors shadow-lg shadow-black/10">
-            Export Lead Report
+        ) : (
+          <div className="bg-white border border-dashed border-slate-200 rounded-3xl p-12 text-center text-slate-400 italic">
+            No leads captured yet. Start a scan from one of your keyword collections.
+          </div>
+        )}
+      </section>
+
+      {/* Quick Action Banner */}
+      <div className="bg-indigo-600 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-200">
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="max-w-xl">
+            <h4 className="text-2xl font-bold mb-2">Build your organic sales engine.</h4>
+            <p className="text-indigo-100 text-sm opacity-90">LeadSync works in the background (when scanning) to find the conversations that matter. All discovered leads are saved in your Platform Folders and Keyword Collections automatically.</p>
+          </div>
+          <button className="bg-white text-indigo-600 px-8 py-3 rounded-2xl font-bold hover:bg-indigo-50 transition-all shadow-lg shadow-black/10 flex-shrink-0">
+            Export Leads (.csv)
           </button>
         </div>
         <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
