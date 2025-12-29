@@ -66,14 +66,14 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
     try {
       const groups = await findFacebookGroups(localLocation);
       if (groups.length === 0) {
-        setSearchError(`No public community groups found for "${localLocation}". Try another city or broaden the location.`);
+        setSearchError(`We couldn't find specific community URLs for "${localLocation}" using live search. Try a nearby larger city or skip to manual keyword scanning.`);
       } else {
         setDiscoveredGroups(groups);
         setSelectedGroupIds(new Set(groups.map(g => g.id)));
       }
     } catch (e) {
       console.error(e);
-      setSearchError("An error occurred while searching for groups. Please try again.");
+      setSearchError("The search tool is currently unavailable. Please try again in a few moments.");
     } finally {
       setIsFindingGroups(false);
     }
@@ -327,7 +327,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
              disabled={leads.length === 0}
              className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm"
            >
-             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003 3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
              Export Results
            </button>
         </div>
