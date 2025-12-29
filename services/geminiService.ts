@@ -2,18 +2,19 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { KeywordFile, Lead, FacebookGroup } from "../types";
 
-export const findFacebookGroups = async (niche: string, location: string): Promise<FacebookGroup[]> => {
+// Helper to find local Facebook groups via search grounding
+export const findFacebookGroups = async (location: string): Promise<FacebookGroup[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // Using gemini-3-pro-preview for better tool use and grounding accuracy
-  const prompt = `SEARCH THE WEB and find a list of 10-15 specific, active, PUBLIC Facebook groups related to the niche "${niche}" in or near "${location}".
+  // Broadening the search to find community hubs where people ask for help/recommendations
+  const prompt = `SEARCH THE WEB and find a list of 10-15 specific, active, PUBLIC Facebook community groups, neighborhood boards, city-wide discussion groups, or local recommendation groups in or near "${location}".
   
   Focus on:
-  1. Niche communities and professional networks.
-  2. Local neighborhood or community boards (e.g., "Austin Small Business", "New York Plumbers").
-  3. Discussion-heavy groups where people ask for recommendations.
+  1. General city community boards (e.g., "${location} Community", "Neighbors of ${location}").
+  2. Local "Recommendations" or "Word of Mouth" groups.
+  3. City-specific professional or interest networks where locals discuss services.
 
-  CRITICAL: You MUST provide the full URL (e.g., https://www.facebook.com/groups/groupname) for each group found.`;
+  CRITICAL: You MUST provide the full URL (e.g., https://www.facebook.com/groups/groupname) for each group found. Do not provide niche-specific groups (like "Plumbers only"), instead find groups where locals HANG OUT and ASK questions.`;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -27,28 +28,24 @@ export const findFacebookGroups = async (niche: string, location: string): Promi
 
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     
-    // Improved filtering to catch various FB group URL patterns
     const groups = sources
       .filter((chunk: any) => {
         const uri = chunk.web?.uri?.toLowerCase() || "";
-        return uri.includes('facebook.com/groups') || uri.includes('facebook.com/community');
+        return uri.includes('facebook.com/groups');
       })
       .map((chunk: any, index: number) => {
         const url = chunk.web.uri;
-        // Clean up title (remove Facebook suffix)
-        let name = chunk.web.title || "FB Group";
+        let name = chunk.web.title || "Local Group";
         name = name.split('|')[0].split('-')[0].replace('Facebook', '').trim();
         
         return {
           id: `group-${Date.now()}-${index}`,
-          name: name || "Discussion Group",
+          name: name || "Community Discussion",
           url: url,
-          niche: niche
+          niche: "Local Community"
         };
       });
 
-    // Remove duplicates based on URL
-    // Fix: Explicitly cast to FacebookGroup[] to resolve 'unknown[]' type mismatch error
     const uniqueGroups = Array.from(new Map(groups.map((item: any) => [item.url, item])).values()) as FacebookGroup[];
     
     return uniqueGroups;
@@ -58,6 +55,7 @@ export const findFacebookGroups = async (niche: string, location: string): Promi
   }
 };
 
+// Helper to find organic leads across platforms using search grounding
 export const findLeads = async (
   file: KeywordFile, 
   specificPlatform?: string | null,
@@ -68,38 +66,37 @@ export const findLeads = async (
   const { keywords, excludeKeywords, niche, location } = file;
   
   const excludeText = excludeKeywords && excludeKeywords.length > 0 
-    ? `\n- EXCLUDE posts containing: ${excludeKeywords.join(', ')}` 
+    ? `\n- EXCLUDE results containing: ${excludeKeywords.join(', ')}` 
     : '';
 
   let platformInstruction = "";
   if (specificPlatform === 'facebook') {
     if (targetGroups && targetGroups.length > 0) {
       const groupUrls = targetGroups.map(g => g.url).join(', ');
-      platformInstruction = `3. PLATFORMS: Focus EXCLUSIVELY on finding leads WITHIN these specific Facebook Group URLs: ${groupUrls}. 
-      Look for recent posts where users are asking for help or recommendations for "${keywords[0]}".`;
-    } else if (searchGroups) {
-      platformInstruction = `3. PLATFORMS: Focus EXCLUSIVELY on finding active public Facebook Groups related to ${niche} and extract leads from recent posts.`;
+      platformInstruction = `3. TARGET: Search specifically within these Facebook Groups: ${groupUrls}.
+      Find posts or comments where users mention: ${keywords.join(' OR ')}.
+      Look for people asking: "Does anyone know...", "Need a...", "Looking for a recommendation for...", "Can anyone help with..."`;
     } else {
-      platformInstruction = `3. PLATFORMS: Focus EXCLUSIVELY on public Facebook posts, discussions, and community pages.`;
+      platformInstruction = `3. TARGET: Search across public Facebook Groups and posts in ${location}. 
+      Look for users mentioning ${keywords.join(' OR ')} in their posts or comments.
+      Focus on high-intent phrases like "help wanted", "looking for", "recommendations".`;
     }
-  } else if (specificPlatform && specificPlatform !== 'web') {
-    platformInstruction = `3. PLATFORMS: Focus EXCLUSIVELY on ${specificPlatform}. Do NOT return results from other sites.`;
   } else {
-    platformInstruction = `3. PLATFORMS: Focus on Facebook, Instagram, Quora, and Nextdoor.`;
+    platformInstruction = `3. PLATFORMS: Focus on ${specificPlatform || 'Facebook, Instagram, Quora, and Nextdoor'}. 
+    Look for specific user-generated discussions containing ${keywords.join(' OR ')} in ${location}.`;
   }
 
   const prompt = `
-    Find specific organic leads or discussions for a ${niche} business.
-    KEYWORDS: ${keywords.join(', ')}
-    LOCATION: ${location}
+    Find specific organic leads (people seeking help/advice) in ${location}.
+    KEYWORDS TO FIND IN POSTS/COMMENTS: ${keywords.join(', ')}
     ${excludeText}
 
     SEARCH GUIDELINES:
-    1. TARGET: Find people asking for advice, help, or recommendations.
-    2. RECENCY: Must be from the last 90 days.
+    1. INTENT: Only find people who are currently seeking a product, service, or advice.
+    2. RECENCY: Must be from the last 60-90 days.
     ${platformInstruction}
 
-    FORMAT: Return a list of high-intent organic opportunities with the exact source URL for each.
+    Return a list of high-intent organic opportunities with the exact source URL for each discussion.
   `;
 
   try {
@@ -118,7 +115,7 @@ export const findLeads = async (
       .filter((chunk: any) => chunk.web?.uri)
       .map((chunk: any, index: number) => {
         const url = chunk.web?.uri || "#";
-        const title = chunk.web?.title || "Organic Opportunity";
+        const title = chunk.web?.title || "Organic Discussion Found";
         
         const urlLower = url.toLowerCase();
         let platform = "Web";
@@ -136,7 +133,7 @@ export const findLeads = async (
           id: `lead-${Date.now()}-${index}`,
           author: author,
           title: title,
-          snippet: `Relevant discussion found on ${platform} matching your criteria for "${keywords[0]}". The user seems to be seeking a solution in the ${niche} space.`,
+          snippet: `Found a potential customer on ${platform} in ${location} searching for help related to "${keywords[0]}". Check the source to engage.`,
           url: url,
           platform: platform,
           relevanceScore: Math.floor(Math.random() * (99 - 85 + 1) + 85),
@@ -154,11 +151,27 @@ export const findLeads = async (
   }
 };
 
-export const analyzeLeadText = async (leadSnippet: string): Promise<string> => {
+// Fix: Added the missing analyzeLeadText export to resolve the compilation error in LeadCard.tsx
+export const analyzeLeadText = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const response: GenerateContentResponse = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `Propose a non-spammy, highly personal outreach strategy for this potential lead snippet: "${leadSnippet}"`,
-  });
-  return response.text || "Could not generate strategy.";
+  const prompt = `Analyze this potential sales lead's post or comment and provide a brief, creative outreach strategy or personalized icebreaker.
+  
+  LEAD CONTENT: "${text}"
+  
+  Keep the strategy short (1-2 sentences) and professional.`;
+
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        temperature: 0.7,
+      },
+    });
+
+    return response.text?.trim() || "Offer a helpful solution or insight related to their specific request in your first message.";
+  } catch (error) {
+    console.error("Error analyzing lead text:", error);
+    return "Focus on providing value and solving their immediate problem in your outreach.";
+  }
 };
