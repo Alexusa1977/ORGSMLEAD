@@ -6,15 +6,18 @@ import { KeywordFile, Lead, FacebookGroup } from "../types";
 export const findFacebookGroups = async (location: string): Promise<FacebookGroup[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // Broadening the search to find community hubs where people ask for help/recommendations
-  const prompt = `SEARCH THE WEB and find a list of 10-15 specific, active, PUBLIC Facebook community groups, neighborhood boards, city-wide discussion groups, or local recommendation groups in or near "${location}".
+  // Prompt explicitly asks for "Community" and "Recommendation" style groups
+  const prompt = `SEARCH THE WEB and find a list of 10-15 active, PUBLIC Facebook groups specifically for the city "${location}".
   
-  Focus on:
-  1. General city community boards (e.g., "${location} Community", "Neighbors of ${location}").
-  2. Local "Recommendations" or "Word of Mouth" groups.
-  3. City-specific professional or interest networks where locals discuss services.
+  Look for groups where residents ask for help, advice, or recommendations.
+  Search for these exact patterns:
+  1. "${location} Community"
+  2. "${location} Recommendations"
+  3. "${location} Neighbors"
+  4. "Word of mouth ${location}"
+  5. "Local help ${location}"
 
-  CRITICAL: You MUST provide the full URL (e.g., https://www.facebook.com/groups/groupname) for each group found. Do not provide niche-specific groups (like "Plumbers only"), instead find groups where locals HANG OUT and ASK questions.`;
+  CRITICAL: You MUST provide the full URL (e.g., https://www.facebook.com/groups/groupname) for each group. Ensure they are PUBLIC groups that allow searching and viewing posts.`;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -28,14 +31,16 @@ export const findFacebookGroups = async (location: string): Promise<FacebookGrou
 
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     
-    const groups = sources
+    const groups: FacebookGroup[] = sources
       .filter((chunk: any) => {
         const uri = chunk.web?.uri?.toLowerCase() || "";
-        return uri.includes('facebook.com/groups');
+        // Check for common FB group URL patterns
+        return uri.includes('facebook.com/groups') || uri.includes('facebook.com/community');
       })
       .map((chunk: any, index: number) => {
         const url = chunk.web.uri;
         let name = chunk.web.title || "Local Group";
+        // Clean up common suffix patterns
         name = name.split('|')[0].split('-')[0].replace('Facebook', '').trim();
         
         return {
@@ -43,10 +48,12 @@ export const findFacebookGroups = async (location: string): Promise<FacebookGrou
           name: name || "Community Discussion",
           url: url,
           niche: "Local Community"
-        };
+        } as FacebookGroup;
       });
 
-    const uniqueGroups = Array.from(new Map(groups.map((item: any) => [item.url, item])).values()) as FacebookGroup[];
+    // Fix: Explicitly type the Map and the resulting array to resolve the "Type 'unknown[]' is not assignable to type 'FacebookGroup[]'" error
+    // Deduplicate by URL
+    const uniqueGroups: FacebookGroup[] = Array.from(new Map<string, FacebookGroup>(groups.map((item) => [item.url, item])).values());
     
     return uniqueGroups;
   } catch (error) {
@@ -73,17 +80,17 @@ export const findLeads = async (
   if (specificPlatform === 'facebook') {
     if (targetGroups && targetGroups.length > 0) {
       const groupUrls = targetGroups.map(g => g.url).join(', ');
-      platformInstruction = `3. TARGET: Search specifically within these Facebook Groups: ${groupUrls}.
-      Find posts or comments where users mention: ${keywords.join(' OR ')}.
-      Look for people asking: "Does anyone know...", "Need a...", "Looking for a recommendation for...", "Can anyone help with..."`;
+      platformInstruction = `3. TARGET: Search for posts and comments inside these specific Facebook Groups: ${groupUrls}.
+      Find people mentioning these exact terms or variations: ${keywords.join(' OR ')}.
+      Focus on questions like "Does anyone know a good...", "Who do you recommend for...", "Need a...".`;
     } else {
       platformInstruction = `3. TARGET: Search across public Facebook Groups and posts in ${location}. 
-      Look for users mentioning ${keywords.join(' OR ')} in their posts or comments.
-      Focus on high-intent phrases like "help wanted", "looking for", "recommendations".`;
+      Look for comments and posts where users are searching for: ${keywords.join(' OR ')}.
+      Find high-intent locals who are looking for advice or service providers.`;
     }
   } else {
     platformInstruction = `3. PLATFORMS: Focus on ${specificPlatform || 'Facebook, Instagram, Quora, and Nextdoor'}. 
-    Look for specific user-generated discussions containing ${keywords.join(' OR ')} in ${location}.`;
+    Look for specific user discussions containing ${keywords.join(' OR ')} in ${location}.`;
   }
 
   const prompt = `
@@ -92,11 +99,11 @@ export const findLeads = async (
     ${excludeText}
 
     SEARCH GUIDELINES:
-    1. INTENT: Only find people who are currently seeking a product, service, or advice.
+    1. INTENT: Find people who are actively asking for recommendations or seeking help.
     2. RECENCY: Must be from the last 60-90 days.
     ${platformInstruction}
 
-    Return a list of high-intent organic opportunities with the exact source URL for each discussion.
+    Return a list of organic opportunities with the exact source URL for each discussion.
   `;
 
   try {
@@ -133,7 +140,7 @@ export const findLeads = async (
           id: `lead-${Date.now()}-${index}`,
           author: author,
           title: title,
-          snippet: `Found a potential customer on ${platform} in ${location} searching for help related to "${keywords[0]}". Check the source to engage.`,
+          snippet: `Potential lead on ${platform} in ${location} searching for "${keywords[0]}". User is asking for advice or a recommendation in a local community discussion.`,
           url: url,
           platform: platform,
           relevanceScore: Math.floor(Math.random() * (99 - 85 + 1) + 85),
@@ -151,7 +158,6 @@ export const findLeads = async (
   }
 };
 
-// Fix: Added the missing analyzeLeadText export to resolve the compilation error in LeadCard.tsx
 export const analyzeLeadText = async (text: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `Analyze this potential sales lead's post or comment and provide a brief, creative outreach strategy or personalized icebreaker.

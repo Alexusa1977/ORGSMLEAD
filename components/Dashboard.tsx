@@ -64,11 +64,12 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
 
     setSearchError(null);
     setIsFindingGroups(true);
+    setDiscoveredGroups([]);
     try {
       // Find broad community groups in the city
       const groups = await findFacebookGroups(localLocation);
       if (groups.length === 0) {
-        setSearchError(`Could not find any public community groups for "${localLocation}". Please check the spelling or try a different city.`);
+        setSearchError(`No public community groups found for "${localLocation}". We'll do a broad city search instead when you scan.`);
       } else {
         setDiscoveredGroups(groups);
         // Auto-select all discovered groups by default
@@ -195,7 +196,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
                 <div className="flex items-center justify-between mb-4">
                    <div>
                      <h4 className="text-sm font-bold text-slate-800">Discover City Groups</h4>
-                     <p className="text-[10px] text-slate-500 font-medium italic">We'll find active public groups in {localLocation || 'your city'} where people ask for help.</p>
+                     <p className="text-[10px] text-slate-500 font-medium italic">We'll find active public groups in {localLocation || 'your city'} where locals ask for help.</p>
                    </div>
                    <button 
                      onClick={handleFindGroups}
