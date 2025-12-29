@@ -9,6 +9,8 @@ export interface KeywordFile {
   createdAt: number;
 }
 
+export type LeadStatus = 'to_be_outreached' | 'outreached' | 'followed_up' | 'replied';
+
 export interface Lead {
   id: string;
   author?: string;
@@ -20,6 +22,7 @@ export interface Lead {
   relevanceScore: number;
   detectedAt: number;
   fileId: string;
+  status: LeadStatus;
   sentiment?: 'positive' | 'neutral' | 'negative';
 }
 

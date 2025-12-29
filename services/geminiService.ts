@@ -49,8 +49,8 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
         else if (urlLower.includes('twitter') || urlLower.includes('x.com')) platform = 'X';
         else if (urlLower.includes('threads')) platform = 'Threads';
         else if (urlLower.includes('quora')) platform = 'Quora';
+        else if (urlLower.includes('facebook')) platform = 'Facebook';
 
-        // Attempt to extract an author name from the title if it contains " - " or similar
         const authorMatch = title.split(/[|\-]/)[0]?.trim();
         const author = authorMatch && authorMatch.length < 30 ? authorMatch : undefined;
         
@@ -58,12 +58,13 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
           id: `lead-${Date.now()}-${index}`,
           author: author,
           title: title,
-          snippet: `Highly relevant discussion found on ${platform} matching your criteria for "${keywords[0]}". The user seems to be seeking a solution in the ${niche} space near ${location}.`,
+          snippet: `Highly relevant discussion found on ${platform} matching your criteria for "${keywords[0]}". The user seems to be seeking a solution in the ${niche} space.`,
           url: url,
           platform: platform,
           relevanceScore: Math.floor(Math.random() * (99 - 85 + 1) + 85),
           detectedAt: Date.now(),
           fileId: file.id,
+          status: 'to_be_outreached',
           sentiment: 'positive'
         };
       });
