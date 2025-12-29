@@ -4,13 +4,20 @@ import { KeywordFile, Lead, FacebookGroup } from "../types";
 
 export const findFacebookGroups = async (niche: string, location: string): Promise<FacebookGroup[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `Find a list of 10 popular public Facebook groups related to the niche "${niche}" in or near "${location}".
-  Focus on groups where potential customers or clients hang out (e.g., community boards, professional networks, interest groups).
-  Return a structured list.`;
+  
+  // Using gemini-3-pro-preview for better tool use and grounding accuracy
+  const prompt = `SEARCH THE WEB and find a list of 10-15 specific, active, PUBLIC Facebook groups related to the niche "${niche}" in or near "${location}".
+  
+  Focus on:
+  1. Niche communities and professional networks.
+  2. Local neighborhood or community boards (e.g., "Austin Small Business", "New York Plumbers").
+  3. Discussion-heavy groups where people ask for recommendations.
+
+  CRITICAL: You MUST provide the full URL (e.g., https://www.facebook.com/groups/groupname) for each group found.`;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview',
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -20,16 +27,33 @@ export const findFacebookGroups = async (niche: string, location: string): Promi
 
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     
-    return sources
-      .filter((chunk: any) => chunk.web?.uri && chunk.web.uri.includes('facebook.com/groups'))
-      .map((chunk: any, index: number) => ({
-        id: `group-${Date.now()}-${index}`,
-        name: chunk.web.title.replace(' | Facebook', '').replace(' - Facebook', '').trim(),
-        url: chunk.web.uri,
-        niche: niche
-      }));
+    // Improved filtering to catch various FB group URL patterns
+    const groups = sources
+      .filter((chunk: any) => {
+        const uri = chunk.web?.uri?.toLowerCase() || "";
+        return uri.includes('facebook.com/groups') || uri.includes('facebook.com/community');
+      })
+      .map((chunk: any, index: number) => {
+        const url = chunk.web.uri;
+        // Clean up title (remove Facebook suffix)
+        let name = chunk.web.title || "FB Group";
+        name = name.split('|')[0].split('-')[0].replace('Facebook', '').trim();
+        
+        return {
+          id: `group-${Date.now()}-${index}`,
+          name: name || "Discussion Group",
+          url: url,
+          niche: niche
+        };
+      });
+
+    // Remove duplicates based on URL
+    // Fix: Explicitly cast to FacebookGroup[] to resolve 'unknown[]' type mismatch error
+    const uniqueGroups = Array.from(new Map(groups.map((item: any) => [item.url, item])).values()) as FacebookGroup[];
+    
+    return uniqueGroups;
   } catch (error) {
-    console.error("Error finding groups:", error);
+    console.error("Error finding groups via Gemini:", error);
     return [];
   }
 };
@@ -50,14 +74,13 @@ export const findLeads = async (
   let platformInstruction = "";
   if (specificPlatform === 'facebook') {
     if (targetGroups && targetGroups.length > 0) {
-      const groupList = targetGroups.map(g => `${g.name} (${g.url})`).join(', ');
-      platformInstruction = `3. PLATFORMS: Focus EXCLUSIVELY on finding leads WITHIN these specific Facebook Groups: ${groupList}. 
-      Look for recent posts where users are asking questions or seeking recommendations relevant to ${niche}.`;
+      const groupUrls = targetGroups.map(g => g.url).join(', ');
+      platformInstruction = `3. PLATFORMS: Focus EXCLUSIVELY on finding leads WITHIN these specific Facebook Group URLs: ${groupUrls}. 
+      Look for recent posts where users are asking for help or recommendations for "${keywords[0]}".`;
     } else if (searchGroups) {
-      platformInstruction = `3. PLATFORMS: Focus EXCLUSIVELY on public Facebook Groups related to ${niche}. 
-      Find active communities and extract leads from their public discussions.`;
+      platformInstruction = `3. PLATFORMS: Focus EXCLUSIVELY on finding active public Facebook Groups related to ${niche} and extract leads from recent posts.`;
     } else {
-      platformInstruction = `3. PLATFORMS: Focus EXCLUSIVELY on Facebook public posts and discussions.`;
+      platformInstruction = `3. PLATFORMS: Focus EXCLUSIVELY on public Facebook posts, discussions, and community pages.`;
     }
   } else if (specificPlatform && specificPlatform !== 'web') {
     platformInstruction = `3. PLATFORMS: Focus EXCLUSIVELY on ${specificPlatform}. Do NOT return results from other sites.`;
@@ -76,7 +99,7 @@ export const findLeads = async (
     2. RECENCY: Must be from the last 90 days.
     ${platformInstruction}
 
-    FORMAT: Return a list of high-intent organic opportunities. 
+    FORMAT: Return a list of high-intent organic opportunities with the exact source URL for each.
   `;
 
   try {
@@ -113,7 +136,7 @@ export const findLeads = async (
           id: `lead-${Date.now()}-${index}`,
           author: author,
           title: title,
-          snippet: `Highly relevant discussion found on ${platform} matching your criteria for "${keywords[0]}". Review the source to craft a personalized response.`,
+          snippet: `Relevant discussion found on ${platform} matching your criteria for "${keywords[0]}". The user seems to be seeking a solution in the ${niche} space.`,
           url: url,
           platform: platform,
           relevanceScore: Math.floor(Math.random() * (99 - 85 + 1) + 85),

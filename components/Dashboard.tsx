@@ -17,6 +17,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
   const [isFindingGroups, setIsFindingGroups] = useState(false);
   const [discoveredGroups, setDiscoveredGroups] = useState<FacebookGroup[]>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
+  const [searchError, setSearchError] = useState<string | null>(null);
   
   // Local state for temporary search overrides
   const [localKeywords, setLocalKeywords] = useState('');
@@ -38,6 +39,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
     // Reset groups when switching view
     setDiscoveredGroups([]);
     setSelectedGroupIds(new Set());
+    setSearchError(null);
   }, [activeFile, activePlatform]);
 
   const handleRunScan = () => {
@@ -55,15 +57,24 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
   };
 
   const handleFindGroups = async () => {
-    if (!localNiche) return;
+    if (!localNiche) {
+      setSearchError("Please enter a niche first.");
+      return;
+    }
+    setSearchError(null);
     setIsFindingGroups(true);
     try {
       const groups = await findFacebookGroups(localNiche, localLocation);
-      setDiscoveredGroups(groups);
-      // Auto-select all by default
-      setSelectedGroupIds(new Set(groups.map(g => g.id)));
+      if (groups.length === 0) {
+        setSearchError(`No public groups found for "${localNiche}" in "${localLocation}". Try a broader niche.`);
+      } else {
+        setDiscoveredGroups(groups);
+        // Auto-select all by default
+        setSelectedGroupIds(new Set(groups.map(g => g.id)));
+      }
     } catch (e) {
       console.error(e);
+      setSearchError("An error occurred while searching for groups. Please try again.");
     } finally {
       setIsFindingGroups(false);
     }
@@ -164,9 +175,11 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
                 <button 
                   onClick={handleRunScan}
                   disabled={isLoading}
-                  className="w-full h-[42px] bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                  className="w-full h-[42px] bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-md shadow-indigo-100"
                 >
-                  {isLoading ? 'Scanning...' : `Run Extraction`}
+                  {isLoading ? (
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  ) : `Run Extraction`}
                 </button>
               </div>
             </div>
@@ -176,47 +189,61 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
                 <div className="flex items-center justify-between mb-4">
                    <div>
                      <h4 className="text-sm font-bold text-slate-800">Target Communities</h4>
-                     <p className="text-[10px] text-slate-500">Discover and select specific Facebook groups to scan</p>
+                     <p className="text-[10px] text-slate-500 font-medium">Discover and select specific Facebook groups to scan</p>
                    </div>
                    <button 
                      onClick={handleFindGroups}
                      disabled={isFindingGroups || !localNiche}
-                     className="px-3 py-1.5 bg-white border border-slate-300 text-indigo-600 rounded-lg text-[10px] font-bold hover:bg-indigo-50 transition-all flex items-center gap-2"
+                     className="px-4 py-2 bg-white border border-slate-300 text-indigo-600 rounded-lg text-[10px] font-bold hover:bg-indigo-50 transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
                    >
-                     {isFindingGroups && <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
-                     Find Public Groups
+                     {isFindingGroups ? (
+                       <svg className="animate-spin h-3 w-3 text-indigo-600" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                     ) : (
+                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                     )}
+                     {isFindingGroups ? 'Searching...' : 'Find Public Groups'}
                    </button>
                 </div>
 
+                {searchError && (
+                  <div className="mb-4 p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 text-xs font-medium">
+                    {searchError}
+                  </div>
+                )}
+
                 {discoveredGroups.length > 0 && (
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                    <button 
-                      onClick={toggleAllGroups}
-                      className="text-[10px] font-bold text-indigo-600 hover:underline mb-1"
-                    >
-                      {selectedGroupIds.size === discoveredGroups.length ? 'Deselect All' : 'Select All Groups'}
-                    </button>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{discoveredGroups.length} Groups Found</span>
+                      <button 
+                        onClick={toggleAllGroups}
+                        className="text-[10px] font-bold text-indigo-600 hover:underline"
+                      >
+                        {selectedGroupIds.size === discoveredGroups.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    </div>
                     {discoveredGroups.map(group => (
                       <div 
                         key={group.id} 
                         onClick={() => toggleGroup(group.id)}
-                        className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${selectedGroupIds.has(group.id) ? 'bg-white border-indigo-200 shadow-sm' : 'bg-transparent border-transparent opacity-60 hover:opacity-100'}`}
+                        className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${selectedGroupIds.has(group.id) ? 'bg-white border-indigo-200 shadow-sm' : 'bg-transparent border-transparent opacity-60 hover:opacity-100 hover:bg-white/50'}`}
                       >
                         <div className="flex items-center gap-3">
                           <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedGroupIds.has(group.id) ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'}`}>
                             {selectedGroupIds.has(group.id) && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
                           </div>
-                          <span className="text-xs font-medium text-slate-700 truncate max-w-[300px]">{group.name}</span>
+                          <span className="text-xs font-bold text-slate-700 truncate max-w-[300px]">{group.name}</span>
                         </div>
-                        <a href={group.url} target="_blank" onClick={(e) => e.stopPropagation()} className="text-[10px] text-slate-400 hover:text-indigo-600 underline">View Group</a>
+                        <a href={group.url} target="_blank" onClick={(e) => e.stopPropagation()} className="text-[10px] text-slate-400 hover:text-indigo-600 underline font-medium">View Group</a>
                       </div>
                     ))}
                   </div>
                 )}
                 
-                {discoveredGroups.length === 0 && !isFindingGroups && (
-                  <div className="py-6 text-center border-2 border-dashed border-slate-200 rounded-xl">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">No target groups found</p>
+                {discoveredGroups.length === 0 && !isFindingGroups && !searchError && (
+                  <div className="py-8 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                    <svg className="w-8 h-8 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">No target groups discovered yet</p>
                   </div>
                 )}
               </div>
@@ -261,7 +288,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
               ))}
             </div>
           ) : !isLoading ? (
-            <div className="bg-white border border-dashed border-slate-300 rounded-3xl p-16 text-center">
+            <div className="bg-white border border-dashed border-slate-300 rounded-3xl p-16 text-center shadow-sm">
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
               </div>
@@ -295,7 +322,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
                 </div>
                 <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between">
                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">Group Targeting</span>
-                   <span className="text-xs font-bold">{selectedGroupIds.size > 0 ? 'Selected List' : 'General Niche'}</span>
+                   <span className="text-xs font-bold">{selectedGroupIds.size > 0 ? `${selectedGroupIds.size} Selected` : 'General Niche'}</span>
                 </div>
              </div>
           </div>
