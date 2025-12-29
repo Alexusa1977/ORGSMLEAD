@@ -19,6 +19,10 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isAutoScanEnabled, setIsAutoScanEnabled] = useState(false);
   
+  // Facebook discovery mode: 'auto' or 'manual'
+  const [discoveryMode, setDiscoveryMode] = useState<'auto' | 'manual'>('auto');
+  const [manualLinks, setManualLinks] = useState('');
+  
   // Local state for temporary search overrides
   const [localKeywords, setLocalKeywords] = useState('');
   const [localLocation, setLocalLocation] = useState('');
@@ -79,6 +83,50 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
     }
   };
 
+  const handleAddManualGroups = () => {
+    const lines = manualLinks.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const newGroups: FacebookGroup[] = lines.map((url, idx) => {
+      // Basic URL cleanup/validation
+      let cleanUrl = url;
+      if (!cleanUrl.startsWith('http')) cleanUrl = 'https://' + cleanUrl;
+      
+      // Attempt to extract a semi-readable name from the URL
+      let name = "Custom Group";
+      try {
+        const parts = cleanUrl.split('/groups/');
+        if (parts.length > 1) {
+          name = parts[1].split('/')[0].split('?')[0].replace(/[-_]/g, ' ');
+          name = name.charAt(0).toUpperCase() + name.slice(1);
+        }
+      } catch (e) {}
+
+      return {
+        id: `manual-${Date.now()}-${idx}`,
+        name: name,
+        url: cleanUrl,
+        niche: 'Manual Entry'
+      };
+    });
+
+    if (newGroups.length > 0) {
+      setDiscoveredGroups(prev => {
+        // Avoid duplicate URLs
+        const existingUrls = new Set(prev.map(g => g.url.toLowerCase()));
+        const uniqueNew = newGroups.filter(g => !existingUrls.has(g.url.toLowerCase()));
+        const combined = [...prev, ...uniqueNew];
+        
+        // Auto-select new groups
+        const newIds = new Set(selectedGroupIds);
+        uniqueNew.forEach(g => newIds.add(g.id));
+        setSelectedGroupIds(newIds);
+        
+        return combined;
+      });
+      setManualLinks('');
+      setDiscoveryMode('auto'); // Switch back to view the list
+    }
+  };
+
   const toggleGroup = (id: string) => {
     const next = new Set(selectedGroupIds);
     if (next.has(id)) next.delete(id);
@@ -127,35 +175,74 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
           <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
             <h2 className="text-2xl font-extrabold text-slate-800 mb-6 flex items-center gap-3">
               <span className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm">1</span>
-              Local Community Discovery
+              Target Community Setup
             </h2>
             
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">City / State</label>
-                <input 
-                  type="text" 
-                  value={localLocation}
-                  onChange={(e) => setLocalLocation(e.target.value)}
-                  placeholder="e.g. Orlando, FL"
-                  className="w-full px-5 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
-                />
-              </div>
-              <div className="flex items-end">
+            {isFacebook && (
+              <div className="flex items-center gap-1 p-1 bg-slate-50 rounded-xl mb-6 w-fit border border-slate-100">
                 <button 
-                  onClick={handleFindGroups}
-                  disabled={isFindingGroups || !localLocation}
-                  className="h-[50px] px-8 bg-indigo-600 text-white rounded-2xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center gap-3 shadow-lg shadow-indigo-100"
+                  onClick={() => setDiscoveryMode('auto')}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${discoveryMode === 'auto' ? 'bg-white text-indigo-600 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
                 >
-                  {isFindingGroups ? (
-                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                  )}
-                  Find Target Groups
+                  Discover by City
+                </button>
+                <button 
+                  onClick={() => setDiscoveryMode('manual')}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${discoveryMode === 'manual' ? 'bg-white text-indigo-600 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  Custom Group Links
                 </button>
               </div>
-            </div>
+            )}
+
+            {discoveryMode === 'auto' ? (
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">City / State</label>
+                  <input 
+                    type="text" 
+                    value={localLocation}
+                    onChange={(e) => setLocalLocation(e.target.value)}
+                    placeholder="e.g. Orlando, FL"
+                    className="w-full px-5 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button 
+                    onClick={handleFindGroups}
+                    disabled={isFindingGroups || !localLocation}
+                    className="h-[50px] px-8 bg-indigo-600 text-white rounded-2xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center gap-3 shadow-lg shadow-indigo-100"
+                  >
+                    {isFindingGroups ? (
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    )}
+                    Find Target Groups
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Enter Group URLs (one per line)</label>
+                  <textarea 
+                    value={manualLinks}
+                    onChange={(e) => setManualLinks(e.target.value)}
+                    placeholder="https://facebook.com/groups/example-1&#10;https://facebook.com/groups/example-2"
+                    rows={4}
+                    className="w-full px-5 py-4 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium resize-none font-mono"
+                  />
+                </div>
+                <button 
+                  onClick={handleAddManualGroups}
+                  disabled={!manualLinks.trim()}
+                  className="w-full px-6 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-md"
+                >
+                  Add Groups to Scan List
+                </button>
+              </div>
+            )}
 
             {searchError && (
               <div className="mt-4 p-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 text-xs font-medium flex items-center gap-3">
@@ -166,12 +253,20 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
 
             {discoveredGroups.length > 0 && (
               <div className="mt-8 animate-in fade-in slide-in-from-top-4 duration-300">
-                <h3 className="text-xl font-extrabold text-slate-800 mb-6 flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm">2</span>
-                  Select Communities to Scan
-                </h3>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-extrabold text-slate-800 flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm">2</span>
+                    Select Communities to Scan
+                  </h3>
+                  <button 
+                    onClick={() => { setDiscoveredGroups([]); setSelectedGroupIds(new Set()); }}
+                    className="text-[10px] font-bold text-rose-500 hover:text-rose-700 uppercase tracking-wider"
+                  >
+                    Clear All
+                  </button>
+                </div>
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{discoveredGroups.length} Groups Found in {localLocation}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{discoveredGroups.length} Communities in List</span>
                   <button onClick={toggleAllGroups} className="text-[10px] font-bold text-indigo-600 hover:underline uppercase tracking-wider">
                     {selectedGroupIds.size === discoveredGroups.length ? 'Deselect All' : 'Select All'}
                   </button>
@@ -187,7 +282,10 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
                         <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-colors ${selectedGroupIds.has(group.id) ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-slate-300'}`}>
                           {selectedGroupIds.has(group.id) && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
                         </div>
-                        <span className="text-xs font-bold text-slate-700 truncate">{group.name}</span>
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-slate-700 truncate block">{group.name}</span>
+                          <span className="text-[9px] text-slate-400 font-medium truncate block">{group.url}</span>
+                        </div>
                       </div>
                       <a href={group.url} target="_blank" onClick={(e) => e.stopPropagation()} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
@@ -327,7 +425,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
              disabled={leads.length === 0}
              className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm"
            >
-             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003 3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
              Export Results
            </button>
         </div>
@@ -347,7 +445,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeFile, activePlatform, leads
                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
               </div>
               <h4 className="text-xl font-bold text-slate-800 mb-2">No results yet</h4>
-              <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">Complete the 3 steps above to start discovering high-intent organic leads in your selected local communities.</p>
+              <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">Complete the steps above to start discovering high-intent organic leads in your selected local communities.</p>
             </div>
           ) : (
              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
