@@ -14,6 +14,7 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
   const platforms = [
     { name: 'Facebook', count: getCountByPlatform('facebook'), icon: 'F', color: 'bg-blue-600' },
     { name: 'LinkedIn', count: getCountByPlatform('linkedin'), icon: 'In', color: 'bg-blue-700' },
+    { name: 'Instagram', count: getCountByPlatform('instagram'), icon: 'Ig', color: 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600' },
     { name: 'Twitter/X', count: getCountByPlatform('x') || getCountByPlatform('twitter'), icon: 'X', color: 'bg-slate-900' },
     { name: 'Reddit', count: getCountByPlatform('reddit'), icon: 'R', color: 'bg-orange-600' },
   ];
@@ -25,7 +26,7 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
     { label: 'Replied', value: getCountByStatus('replied'), sub: 'Hot leads' },
   ];
 
-  const recentLeads = leads.sort((a, b) => b.detectedAt - a.detectedAt).slice(0, 5);
+  const recentLeads = leads.sort((a, b) => b.detectedAt - a.detectedAt).slice(0, 6);
 
   return (
     <div className="max-w-6xl mx-auto space-y-12 py-4">
@@ -36,35 +37,35 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
           <h3 className="text-lg font-medium text-slate-500 mb-6 flex items-baseline gap-2">
             Leads <span className="text-xs text-slate-400 font-normal">(To be outreached)</span>
           </h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {platforms.map((p) => (
-              <div key={p.name} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+              <div key={p.name} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-baseline gap-2 mb-4">
                    <span className="text-2xl font-bold text-indigo-900">{p.count > 1000 ? (p.count / 1000).toFixed(1) + 'K' : p.count}</span>
                    <span className="text-sm font-semibold text-indigo-800">leads</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full ${p.color} flex items-center justify-center text-white text-xs font-bold shadow-sm`}>
+                  <div className={`w-8 h-8 rounded-full ${p.color} flex items-center justify-center text-white text-[10px] font-bold shadow-sm`}>
                     {p.icon}
                   </div>
-                  <span className="text-sm font-medium text-slate-600">{p.name}</span>
+                  <span className="text-xs font-medium text-slate-600 truncate">{p.name}</span>
                 </div>
               </div>
             ))}
             
             {/* Connect placeholders */}
-            <div className="bg-white/50 p-6 rounded-2xl border border-dashed border-slate-200 flex flex-col justify-center items-start group hover:bg-white transition-all cursor-pointer">
-              <span className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest">Connect</span>
+            <div className="bg-white/50 p-5 rounded-2xl border border-dashed border-slate-200 flex flex-col justify-center items-start group hover:bg-white transition-all cursor-pointer">
+              <span className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">Connect</span>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-[10px] font-bold uppercase shadow-sm">n</div>
-                <span className="text-sm font-medium text-slate-400 group-hover:text-slate-600">Nextdoor</span>
+                <span className="text-xs font-medium text-slate-400 group-hover:text-slate-600">Nextdoor</span>
               </div>
             </div>
-            <div className="bg-white/50 p-6 rounded-2xl border border-dashed border-slate-200 flex flex-col justify-center items-start group hover:bg-white transition-all cursor-pointer">
-              <span className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest">Connect</span>
+            <div className="bg-white/50 p-5 rounded-2xl border border-dashed border-slate-200 flex flex-col justify-center items-start group hover:bg-white transition-all cursor-pointer">
+              <span className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">Connect</span>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-[10px] font-bold uppercase shadow-sm">w</div>
-                <span className="text-sm font-medium text-slate-400 group-hover:text-slate-600">Whatsapp</span>
+                <span className="text-xs font-medium text-slate-400 group-hover:text-slate-600">Whatsapp</span>
               </div>
             </div>
           </div>
@@ -95,7 +96,7 @@ const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ leads }) => {
            <p className="text-xs font-medium text-slate-400">Showing top {recentLeads.length} matches across all folders</p>
         </div>
         {recentLeads.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {recentLeads.map(lead => (
               <LeadCard key={lead.id} lead={lead} />
             ))}

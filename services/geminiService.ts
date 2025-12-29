@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { KeywordFile, Lead } from "../types";
+import { KeywordFile, Lead, LeadStatus } from "../types";
 
 export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sources: any[] }> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -17,11 +17,11 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
     ${excludeText}
 
     SEARCH GUIDELINES:
-    1. TARGET: Find people on Reddit, X/Twitter, LinkedIn, Threads, and Quora asking for advice, help, or recommendations.
+    1. TARGET: Find people on Instagram, Reddit, X/Twitter, LinkedIn, Threads, and Quora asking for advice, help, or recommendations.
     2. RECENCY: Must be from the last 90 days.
     3. DATA: Identify the author's username if possible from the search result.
 
-    FORMAT: Return a list of high-intent organic opportunities.
+    FORMAT: Return a list of high-intent organic opportunities. For Instagram, look for public posts or comments.
   `;
 
   try {
@@ -50,6 +50,7 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
         else if (urlLower.includes('threads')) platform = 'Threads';
         else if (urlLower.includes('quora')) platform = 'Quora';
         else if (urlLower.includes('facebook')) platform = 'Facebook';
+        else if (urlLower.includes('instagram')) platform = 'Instagram';
 
         const authorMatch = title.split(/[|\-]/)[0]?.trim();
         const author = authorMatch && authorMatch.length < 30 ? authorMatch : undefined;

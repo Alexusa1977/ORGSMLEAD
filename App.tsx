@@ -71,7 +71,7 @@ const App: React.FC = () => {
   const getFilteredLeads = () => {
     if (activeView === 'dashboard') return allLeads.sort((a, b) => b.detectedAt - a.detectedAt).slice(0, 10);
     if (activeView === 'platform' && activePlatform) {
-      return allLeads.filter(l => l.platform.toLowerCase() === activePlatform.toLowerCase());
+      return allLeads.filter(l => l.platform.toLowerCase().includes(activePlatform.toLowerCase()));
     }
     if (activeView === 'collection' && activeFileId) {
       return allLeads.filter(l => l.fileId === activeFileId);
@@ -142,6 +142,7 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <Sidebar 
         files={files} 
+        leads={allLeads}
         activeFileId={activeFileId} 
         activePlatform={activePlatform}
         onSelectFile={(id) => { setActiveFileId(id); setActivePlatform(null); setActiveView('collection'); }}
