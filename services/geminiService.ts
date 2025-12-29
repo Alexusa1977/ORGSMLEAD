@@ -103,9 +103,17 @@ export const findLeads = async (
   let platformInstruction = "";
   if (specificPlatform === 'facebook') {
     if (targetGroups && targetGroups.length > 0) {
-      const groupUrls = targetGroups.map(g => g.url).join(', ');
-      platformInstruction = `3. TARGET: Search specifically for recent discussions inside these Facebook Groups: ${groupUrls}.
-      Look for posts where people are asking for: ${keywords.join(' OR ')}.`;
+      // Use specific site: searches for each target group to force deep indexing discovery
+      const groupQueries = targetGroups.map(g => {
+        const path = g.url.split('facebook.com')[1] || '';
+        return `site:facebook.com${path} "${keywords.join('" OR "')}"`;
+      }).slice(0, 5).join('\n'); // Limit to 5 for prompt space but prioritize
+
+      platformInstruction = `3. TARGET: I want you to search inside these specific Facebook groups for recent posts matching my keywords. 
+      Use these search patterns for the live web tool:
+      ${groupQueries}
+      
+      Look for people saying things like "looking for recommendations", "can anyone suggest", or asking about ${keywords.join('/')}.`;
     } else {
       platformInstruction = `3. TARGET: Search public Facebook content in ${location} for phrases like "looking for recommendations", "can anyone recommend", "need a" followed by ${keywords.join(' OR ')}.`;
     }
@@ -122,11 +130,11 @@ export const findLeads = async (
     GOAL: Find real people asking for help, services, or product recommendations.
     ${platformInstruction}
 
-    Return a list of specific URLs to these discussions.`;
+    CRITICAL: You must find and return direct URLs to the specific posts or comment threads. If you find multiple matches, list them all.`;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview', // Pro is better for complex search/extraction tasks
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
@@ -135,8 +143,10 @@ export const findLeads = async (
     });
 
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    const text = response.text || "";
 
-    const leads: Lead[] = sources
+    // 1. Extract from grounding chunks
+    const leadsFromChunks: Lead[] = sources
       .filter((chunk: any) => chunk.web?.uri)
       .map((chunk: any, index: number) => {
         const url = chunk.web?.uri || "#";
@@ -150,7 +160,7 @@ export const findLeads = async (
         else if (urlLower.includes('nextdoor.com')) platform = 'Nextdoor';
 
         return {
-          id: `lead-${Date.now()}-${index}`,
+          id: `lead-chunk-${Date.now()}-${index}`,
           author: title.split(/[-|]/)[0]?.trim() || "Local User",
           title: title,
           snippet: `Active discussion found in ${location} regarding "${keywords[0]}". Click to view the original source and respond.`,
@@ -161,10 +171,47 @@ export const findLeads = async (
           fileId: file.id,
           status: 'to_be_outreached',
           sentiment: 'positive'
-        };
+        } as Lead;
       });
 
-    return { leads, sources };
+    // 2. Extract from text using regex (Fallback for when grounding chunks miss the specific links)
+    const urlRegex = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
+    const matches = text.match(urlRegex) || [];
+    const leadsFromText: Lead[] = matches
+      .filter(url => {
+        const urlLower = url.toLowerCase();
+        return urlLower.includes('facebook.com') || urlLower.includes('quora.com') || urlLower.includes('nextdoor.com') || urlLower.includes('instagram.com');
+      })
+      .map((url, index) => {
+        const urlLower = url.toLowerCase();
+        let platform = "Web";
+        if (urlLower.includes('quora.com')) platform = 'Quora';
+        else if (urlLower.includes('facebook.com')) platform = 'Facebook';
+        else if (urlLower.includes('instagram.com')) platform = 'Instagram';
+        else if (urlLower.includes('nextdoor.com')) platform = 'Nextdoor';
+
+        return {
+          id: `lead-text-${Date.now()}-${index}`,
+          author: "Recent User",
+          title: "New Opportunity Found",
+          snippet: `Discovered a potential lead matching your keywords "${keywords.slice(0,2).join(', ')}" on ${platform}.`,
+          url: url,
+          platform: platform,
+          relevanceScore: 90,
+          detectedAt: Date.now(),
+          fileId: file.id,
+          status: 'to_be_outreached',
+          sentiment: 'positive'
+        } as Lead;
+      });
+
+    // Combine and deduplicate
+    const allLeads = [...leadsFromChunks, ...leadsFromText];
+    const uniqueLeads = Array.from(
+      new Map(allLeads.map(l => [l.url.toLowerCase().replace(/\/$/, ''), l])).values()
+    );
+
+    return { leads: uniqueLeads, sources };
   } catch (error) {
     console.error("Error finding leads:", error);
     return { leads: [], sources: [] };
