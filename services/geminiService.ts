@@ -23,8 +23,8 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
     4. PLATFORMS: Focus ONLY on Facebook, Instagram, and Quora. Do NOT include Twitter, X, Reddit, or LinkedIn.
 
     FORMAT: Return a list of high-intent organic opportunities. 
-    - For Quora, find specific questions.
-    - For Instagram/Facebook, find public discussions, posts, or groups.
+    - For Quora, find specific questions related to the niche.
+    - For Instagram/Facebook, find public discussions, posts, or groups where help is needed.
   `;
 
   try {
@@ -51,7 +51,7 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
         if (urlLower.includes('quora.com')) platform = 'Quora';
         else if (urlLower.includes('facebook.com')) platform = 'Facebook';
         else if (urlLower.includes('instagram.com')) platform = 'Instagram';
-        else if (urlLower.includes('threads.net')) platform = 'Threads';
+        else if (urlLower.includes('threads.net')) platform = 'Instagram'; // Map Threads to Instagram ecosystem
 
         const authorMatch = title.split(/[|\-]/)[0]?.trim();
         const author = authorMatch && authorMatch.length < 30 ? authorMatch : undefined;
@@ -60,7 +60,7 @@ export const findLeads = async (file: KeywordFile): Promise<{ leads: Lead[], sou
           id: `lead-${Date.now()}-${index}`,
           author: author,
           title: title,
-          snippet: `Highly relevant discussion found on ${platform} matching your criteria for "${keywords[0]}". The user seems to be seeking a solution in the ${niche} space.`,
+          snippet: `Highly relevant discussion found on ${platform} matching your criteria for "${keywords[0]}". The user seems to be seeking a solution in the ${niche} space. Review the source to craft a personalized response.`,
           url: url,
           platform: platform,
           relevanceScore: Math.floor(Math.random() * (99 - 85 + 1) + 85),

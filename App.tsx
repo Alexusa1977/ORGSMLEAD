@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { KeywordFile, Lead, LeadStatus } from './types';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'dashboard' | 'outreach' | 'settings' | 'collection' | 'platform'>('dashboard');
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const isInitialized = useRef(false);
 
   // Initialize data
   useEffect(() => {
@@ -54,15 +55,24 @@ const App: React.FC = () => {
         })));
       } catch (e) { console.error(e); }
     }
+    
+    // Use a small delay or requestAnimationFrame to ensure states are updated before marking as initialized
+    setTimeout(() => {
+      isInitialized.current = true;
+    }, 100);
   }, []);
 
-  // Save data
+  // Save data - only after initial load to prevent overwriting
   useEffect(() => {
-    if (files.length > 0) localStorage.setItem('lead_sync_files', JSON.stringify(files));
+    if (isInitialized.current && files.length > 0) {
+      localStorage.setItem('lead_sync_files', JSON.stringify(files));
+    }
   }, [files]);
 
   useEffect(() => {
-    localStorage.setItem('lead_sync_leads', JSON.stringify(allLeads));
+    if (isInitialized.current) {
+      localStorage.setItem('lead_sync_leads', JSON.stringify(allLeads));
+    }
   }, [allLeads]);
 
   const activeFile = files.find(f => f.id === activeFileId);
@@ -74,7 +84,8 @@ const App: React.FC = () => {
       return allLeads.filter(l => {
         const plat = l.platform.toLowerCase();
         const target = activePlatform.toLowerCase();
-        if (target === 'x') return plat === 'x' || plat === 'twitter';
+        // Handle special cases or exact matches
+        if (target === 'web') return plat === 'web';
         return plat.includes(target);
       });
     }
@@ -164,9 +175,9 @@ const App: React.FC = () => {
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold text-slate-800">
               {activeView === 'dashboard' ? 'Overview' : 
-               activeView === 'platform' ? `${activePlatform === 'x' ? 'Twitter/X' : activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)} Leads` :
+               activeView === 'platform' && activePlatform ? `${activePlatform === 'web' ? 'General Web' : activePlatform.charAt(0).toUpperCase() + activePlatform.slice(1)} Leads` :
                activeView === 'outreach' ? 'All Leads' :
-               activeFile?.name}
+               activeFile?.name || 'Lead Vault'}
             </h1>
             {activeView === 'collection' && activeFile && (
               <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-xs font-bold">
