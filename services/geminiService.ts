@@ -3,6 +3,39 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { KeywordFile, Lead, FacebookGroup } from "../types";
 
 /**
+ * Normalizes Facebook URLs to ensure they are well-formed and accessible.
+ * Ensures 'www.' prefix and removes trailing punctuation common in AI outputs.
+ */
+const normalizeFacebookUrl = (url: string): string => {
+  let cleaned = url.trim();
+  
+  // Remove trailing punctuation that might have been caught by regex or AI text
+  cleaned = cleaned.replace(/[.,)\]!?;:]+$/, '');
+  
+  // Ensure protocol
+  if (!cleaned.startsWith('http')) {
+    cleaned = 'https://' + cleaned;
+  }
+  
+  try {
+    const urlObj = new URL(cleaned);
+    
+    // Force www.facebook.com instead of m.facebook.com or mobile.facebook.com
+    if (urlObj.hostname.includes('facebook.com')) {
+      urlObj.hostname = 'www.facebook.com';
+    }
+    
+    // Remove tracking parameters often added by FB or search engines
+    const params = ['__cft__[0]', '__tn__', 'ref', 'extid', 'mibextid'];
+    params.forEach(p => urlObj.searchParams.delete(p));
+    
+    return urlObj.toString();
+  } catch (e) {
+    return cleaned;
+  }
+};
+
+/**
  * Robust Facebook Group Discovery
  * Uses targeted search queries to find active public communities.
  */
@@ -33,14 +66,13 @@ export const findFacebookGroups = async (location: string): Promise<FacebookGrou
     const text = response.text || "";
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     
-    // Extraction Pipeline: Chunks -> Text Regex -> Deduplication
     const foundGroups = new Map<string, FacebookGroup>();
 
     // Phase 1: Grounding Metadata
     sources.forEach((chunk: any, index: number) => {
       const uri = chunk.web?.uri;
       if (uri && uri.includes('facebook.com/groups/')) {
-        const cleanUrl = uri.split('?')[0].replace(/\/$/, '');
+        const cleanUrl = normalizeFacebookUrl(uri);
         const name = chunk.web.title?.split('|')[0].trim() || "Community Group";
         foundGroups.set(cleanUrl.toLowerCase(), {
           id: `chunk-${Date.now()}-${index}`,
@@ -51,11 +83,11 @@ export const findFacebookGroups = async (location: string): Promise<FacebookGrou
       }
     });
 
-    // Phase 2: Text Regex Fallback (Catches links Gemini mentions but doesn't "chunk")
-    const fbRegex = /https?:\/\/(www\.)?facebook\.com\/groups\/[a-zA-Z0-9\.]+\/?/g;
+    // Phase 2: Text Regex Fallback (Improved to catch dashes and underscores in slugs)
+    const fbRegex = /https?:\/\/(?:www\.)?facebook\.com\/groups\/[a-zA-Z0-9\._-]+\/?/g;
     const matches = text.match(fbRegex) || [];
     matches.forEach((url, index) => {
-      const cleanUrl = url.split('?')[0].replace(/\/$/, '');
+      const cleanUrl = normalizeFacebookUrl(url);
       if (!foundGroups.has(cleanUrl.toLowerCase())) {
         foundGroups.set(cleanUrl.toLowerCase(), {
           id: `text-${Date.now()}-${index}`,
@@ -86,23 +118,19 @@ export const findLeads = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const { keywords, excludeKeywords, location } = file;
   
-  // Construct aggressive search queries
   const positiveQueries = keywords.map(k => `"${k}"`).join(' OR ');
   const negativeQueries = excludeKeywords.length > 0 ? excludeKeywords.map(k => `-"${k}"`).join(' ') : '';
   
   let searchStrategy = "";
   if (specificPlatform === 'facebook' && targetGroups && targetGroups.length > 0) {
-    // Search specific group subdirectories
     const siteLimits = targetGroups.slice(0, 3).map(g => {
       const groupPath = g.url.split('facebook.com')[1];
       return `site:facebook.com${groupPath}`;
     }).join(' OR ');
     searchStrategy = `Focus on finding RECENT posts (last 30 days) within these specific areas: ${siteLimits}. Look for: ${positiveQueries} ${negativeQueries}`;
   } else if (specificPlatform === 'nextdoor') {
-    // Nextdoor specific: Location is likely the neighborhood name/url context passed in from App.tsx
     searchStrategy = `site:nextdoor.com "${positiveQueries}" ${negativeQueries} "recommendation" OR "neighbor" OR "looking for". CONTEXT: ${location}`;
   } else {
-    // Broad platform search
     const site = specificPlatform ? `site:${specificPlatform}.com` : '(site:facebook.com OR site:quora.com OR site:reddit.com OR site:nextdoor.com)';
     searchStrategy = `${site} "${location}" (${positiveQueries}) ${negativeQueries} "recommendations" OR "looking for" OR "anyone know"`;
   }
@@ -122,7 +150,7 @@ export const findLeads = async (
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
-        temperature: 0.1, // Low temperature for accuracy
+        temperature: 0.1,
       },
     });
 
@@ -133,10 +161,13 @@ export const findLeads = async (
     // Extraction Phase 1: Grounding
     chunks.forEach((chunk: any, index: number) => {
       if (chunk.web?.uri) {
-        const url = chunk.web.uri;
+        let url = chunk.web.uri;
         let platform = 'Web';
-        if (url.includes('facebook')) platform = 'Facebook';
-        else if (url.includes('quora')) platform = 'Quora';
+        
+        if (url.includes('facebook.com')) {
+          url = normalizeFacebookUrl(url);
+          platform = 'Facebook';
+        } else if (url.includes('quora')) platform = 'Quora';
         else if (url.includes('nextdoor')) platform = 'Nextdoor';
         else if (url.includes('reddit')) platform = 'Reddit';
 
@@ -155,21 +186,24 @@ export const findLeads = async (
       }
     });
 
-    // Extraction Phase 2: Regex Fallback for URLs in text
-    const urlRegex = /https?:\/\/[^\s$.?#].[^\s]*/g;
+    // Extraction Phase 2: Regex Fallback (Improved URL regex to avoid trailing noise)
+    const urlRegex = /https?:\/\/[^\s$.?#][^\s]*[a-zA-Z0-9\/]/g;
     const textUrls = text.match(urlRegex) || [];
     textUrls.forEach((url, index) => {
-      // Filter for platform URLs
-      const lowerUrl = url.toLowerCase();
+      let cleanUrl = url;
+      if (url.includes('facebook.com')) {
+        cleanUrl = normalizeFacebookUrl(url);
+      }
+      
+      const lowerUrl = cleanUrl.toLowerCase();
       if (lowerUrl.includes('facebook.com') || lowerUrl.includes('quora.com') || lowerUrl.includes('reddit.com') || lowerUrl.includes('nextdoor.com')) {
-        const cleanUrl = url.replace(/[.,)]+$/, '');
-        if (!foundLeads.has(cleanUrl.toLowerCase())) {
+        if (!foundLeads.has(lowerUrl)) {
           let platform = 'Web';
-          if (cleanUrl.includes('facebook')) platform = 'Facebook';
-          else if (cleanUrl.includes('nextdoor')) platform = 'Nextdoor';
-          else if (cleanUrl.includes('quora')) platform = 'Quora';
+          if (lowerUrl.includes('facebook')) platform = 'Facebook';
+          else if (lowerUrl.includes('nextdoor')) platform = 'Nextdoor';
+          else if (lowerUrl.includes('quora')) platform = 'Quora';
 
-          foundLeads.set(cleanUrl.toLowerCase(), {
+          foundLeads.set(lowerUrl, {
             id: `lead-t-${Date.now()}-${index}`,
             author: "Discussion Participant",
             title: "New Opportunity Found",
