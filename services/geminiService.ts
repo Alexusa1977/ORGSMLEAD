@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { KeywordFile, Lead, FacebookGroup } from "../types";
 
 /**
@@ -26,7 +26,7 @@ const normalizeFacebookUrl = (url: string): string => {
     }
     
     // Remove tracking parameters often added by FB or search engines
-    const params = ['__cft__[0]', '__tn__', 'ref', 'extid', 'mibextid'];
+    const params = ['__cft__[0]', '__tn__', 'ref', 'extid', 'mibextid', 'rdid'];
     params.forEach(p => urlObj.searchParams.delete(p));
     
     return urlObj.toString();
@@ -37,7 +37,6 @@ const normalizeFacebookUrl = (url: string): string => {
 
 /**
  * Robust Facebook Group Discovery
- * Uses targeted search queries to find active public communities.
  */
 export const findFacebookGroups = async (location: string): Promise<FacebookGroup[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -48,10 +47,8 @@ export const findFacebookGroups = async (location: string): Promise<FacebookGrou
   Target patterns: 
   - "site:facebook.com/groups/ ${location} recommendations"
   - "site:facebook.com/groups/ ${location} community"
-  - "site:facebook.com/groups/ ${location} word of mouth"
   
-  Return the results as a list of group names and their full URLs (https://www.facebook.com/groups/...).
-  Only provide groups that are currently active.`;
+  Return the results as a list of group names and their full URLs.`;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -68,7 +65,6 @@ export const findFacebookGroups = async (location: string): Promise<FacebookGrou
     
     const foundGroups = new Map<string, FacebookGroup>();
 
-    // Phase 1: Grounding Metadata
     sources.forEach((chunk: any, index: number) => {
       const uri = chunk.web?.uri;
       if (uri && uri.includes('facebook.com/groups/')) {
@@ -83,7 +79,6 @@ export const findFacebookGroups = async (location: string): Promise<FacebookGrou
       }
     });
 
-    // Phase 2: Text Regex Fallback (Improved to catch dashes and underscores in slugs)
     const fbRegex = /https?:\/\/(?:www\.)?facebook\.com\/groups\/[a-zA-Z0-9\._-]+\/?/g;
     const matches = text.match(fbRegex) || [];
     matches.forEach((url, index) => {
@@ -106,8 +101,40 @@ export const findFacebookGroups = async (location: string): Promise<FacebookGrou
 };
 
 /**
+ * Extracts a preview of comments/discussion from a specific URL.
+ */
+export const fetchThreadPreview = async (url: string): Promise<string[]> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const prompt = `Analyze the conversation at this URL: ${url}. 
+  I need a preview of the discussion. Extract 2-3 relevant comments, replies, or specific details mentioned in the thread.
+  If you cannot find specific comments, summarize the general sentiment and key points discussed.
+  
+  Format the output as a simple JSON array of strings.`;
+
+  try {
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
+      },
+    });
+
+    const result = JSON.parse(response.text || "[]");
+    return Array.isArray(result) ? result : [];
+  } catch (error) {
+    console.error("Thread Preview Error:", error);
+    return ["Unable to load live comments at this moment. Click 'View Source' to see the full post on the platform."];
+  }
+};
+
+/**
  * Advanced Lead Monitoring
- * Uses specific search operators to find recent organic intent.
  */
 export const findLeads = async (
   file: KeywordFile, 
@@ -140,9 +167,7 @@ export const findLeads = async (
   STRATEGY: ${searchStrategy}
   
   I am looking for real people (not businesses) asking for help or services.
-  CRITICAL: You must extract and return the DIRECT URL to each specific post, comment thread, or discussion found. 
-  
-  If the search tool returns snippets, analyze them carefully to ensure they match the intent of "${keywords.join(', ')}".`;
+  CRITICAL: You must extract and return the DIRECT URL to each specific post, comment thread, or discussion found.`;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -158,7 +183,6 @@ export const findLeads = async (
     const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     const foundLeads = new Map<string, Lead>();
 
-    // Extraction Phase 1: Grounding
     chunks.forEach((chunk: any, index: number) => {
       if (chunk.web?.uri) {
         let url = chunk.web.uri;
@@ -186,7 +210,6 @@ export const findLeads = async (
       }
     });
 
-    // Extraction Phase 2: Regex Fallback (Improved URL regex to avoid trailing noise)
     const urlRegex = /https?:\/\/[^\s$.?#][^\s]*[a-zA-Z0-9\/]/g;
     const textUrls = text.match(urlRegex) || [];
     textUrls.forEach((url, index) => {

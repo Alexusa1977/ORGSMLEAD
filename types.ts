@@ -40,6 +40,7 @@ export interface Lead {
   fileId: string;
   status: LeadStatus;
   sentiment?: 'positive' | 'neutral' | 'negative';
+  previewComments?: string[];
 }
 
 export interface SearchResult {
